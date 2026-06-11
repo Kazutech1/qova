@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String         @id @default(auto()) @map("_id") @db.ObjectId
+  name                String
+  phone               String         @unique
+  bank_account_number String?
+  bank_code           String?
+  bank_name           String?
+  reliability_score   Int            @default(100)
+  bvn_verified        Boolean        @default(false)
+  created_at          DateTime       @default(now())
+  updated_at          DateTime       @updatedAt
+
+  memberships    Membership[]
+  contributions  Contribution[]
+  payouts        Payout[]
+  savings_vaults SavingsVault[]
+  circles_admin  Circle[]
+}
+
+model Circle {
+  id                  String          @id @default(auto()) @map("_id") @db.ObjectId
+  name                String
+  invite_code         String          @unique
+  admin_id            String          @db.ObjectId
+  contribution_amount Int             // stored in kobo
+  frequency           Frequency
+  total_slots         Int
+  status              CircleStatus    @default(ACTIVE)
+  payout_order_type   PayoutOrderType @default(AUTO)
+  start_condition     StartCondition  @default(AUTO)
+  payout_order        String[]        @db.ObjectId
+  current_cycle       Int             @default(1)
+  created_at          DateTime        @default(now())
+
+  admin         User           @relation(fields: [admin_id], references: [id])
+  memberships   Membership[]
+  contributions Contribution[]
+  payouts       Payout[]
+}
+
+model Membership {
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  user_id             String   @db.ObjectId
+  circle_id           String   @db.ObjectId
+  slot_number         Int
+  has_received_payout Boolean  @default(false)
+  joined_at           DateTime @default(now())
+
+  user   User   @relation(fields: [user_id], references: [id])
+  circle Circle @relation(fields: [circle_id], references: [id])
+}
+
+model Contribution {
+  id              String             @id @default(auto()) @map("_id") @db.ObjectId
+  user_id         String             @db.ObjectId
+  circle_id       String             @db.ObjectId
+  cycle_number    Int
+  amount          Int                // stored in kobo
+  paid_at         DateTime?
+  status          ContributionStatus @default(PENDING)
+  nomba_reference String?
+  created_at      DateTime           @default(now())
+
+  user   User   @relation(fields: [user_id], references: [id])
+  circle Circle @relation(fields: [circle_id], references: [id])
+}
+
+model Payout {
+  id                     String   @id @default(auto()) @map("_id") @db.ObjectId
+  circle_id              String   @db.ObjectId
+  recipient_id           String   @db.ObjectId
+  cycle_number           Int
+  amount                 Int      // stored in kobo
+  paid_at                DateTime @default(now())
+  nomba_transfer_reference String?
+
+  circle    Circle @relation(fields: [circle_id], references: [id])
+  recipient User   @relation(fields: [recipient_id], references: [id])
+}
+
+model SavingsVault {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  user_id        String    @db.ObjectId
+  goal_name      String
+  target_amount  Int       // stored in kobo
+  current_amount Int       @default(0)
+  locked         Boolean   @default(false)
+  target_date    DateTime?
+  created_at     DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id])
+}
+
+model OTP {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  phone      String
+  code       String
+  expires_at DateTime
+  used       Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@index([phone])
+}
+
+enum Frequency {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+enum CircleStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  PAUSED
+}
+
+enum PayoutOrderType {
+  AUTO
+  MANUAL
+}
+
+enum StartCondition {
+  AUTO
+  MANUAL
+}
+
+enum ContributionStatus {
+  PENDING
+  PAID
+  LATE
+  MISSED
+}
