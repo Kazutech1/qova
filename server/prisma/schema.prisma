@@ -34,11 +34,13 @@ model Circle {
   contribution_amount Int             // stored in kobo
   frequency           Frequency
   total_slots         Int
-  status              CircleStatus    @default(ACTIVE)
+  status              CircleStatus    @default(PENDING)
   payout_order_type   PayoutOrderType @default(AUTO)
   start_condition     StartCondition  @default(AUTO)
   payout_order        String[]        @db.ObjectId
   current_cycle       Int             @default(1)
+  start_date          DateTime?       // admin's intended first payment date
+  cycle_started_at    DateTime?       // set on first PAID contribution — anchors all due dates
   created_at          DateTime        @default(now())
 
   admin         User           @relation(fields: [admin_id], references: [id])
@@ -60,15 +62,19 @@ model Membership {
 }
 
 model Contribution {
-  id              String             @id @default(auto()) @map("_id") @db.ObjectId
-  user_id         String             @db.ObjectId
-  circle_id       String             @db.ObjectId
-  cycle_number    Int
-  amount          Int                // stored in kobo
-  paid_at         DateTime?
-  status          ContributionStatus @default(PENDING)
-  nomba_reference String?
-  created_at      DateTime           @default(now())
+  id                     String             @id @default(auto()) @map("_id") @db.ObjectId
+  user_id                String             @db.ObjectId
+  circle_id              String             @db.ObjectId
+  cycle_number           Int
+  amount                 Int                // stored in kobo
+  due_date               DateTime?
+  paid_at                DateTime?
+  status                 ContributionStatus @default(PENDING)
+  nomba_reference        String?
+  nomba_account_ref      String?            @unique // virtual account reference for webhook lookup
+  virtual_account_number String?
+  virtual_account_bank   String?
+  created_at             DateTime           @default(now())
 
   user   User   @relation(fields: [user_id], references: [id])
   circle Circle @relation(fields: [circle_id], references: [id])

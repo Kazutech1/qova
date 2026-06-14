@@ -196,7 +196,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-canvas text-ink selection:bg-forest/10 selection:text-forest flex flex-col font-sans relative">
-      
+
       {/* 1. Live Activity Ticker (The Qova Pulse) */}
       <div className="w-full bg-forest text-canvas text-xs font-semibold py-2.5 px-6 flex justify-center items-center overflow-hidden border-b border-white/5 relative z-50">
         <div className="max-w-7xl w-full flex justify-between items-center">
@@ -212,29 +212,29 @@ export default function Home() {
 
       {/* Hero Section */}
       <section className="relative pt-16 pb-24 md:py-28 overflow-hidden border-b border-forest/5 animate-fade-in-up">
-        
+
         {/* Floating Background Mesh Glows */}
         <div className="absolute top-[-100px] left-[-100px] w-[500px] h-[500px] bg-glow-forest rounded-full -z-10 animate-drift" />
         <div className="absolute bottom-[-100px] right-[-100px] w-[500px] h-[500px] bg-glow-emerald rounded-full -z-10 animate-drift" style={{ animationDelay: '-10s' }} />
 
         {/* Subtle Background Print ( Nigerians connecting ) with Zoom-Fade entry */}
-        <div 
-          className="absolute inset-0 opacity-[0.04] bg-cover bg-center pointer-events-none -z-20 animate-zoom-fade" 
-          style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1531206715517-5c161743ede5?auto=format&fit=crop&w=1600&q=80")' }} 
+        <div
+          className="absolute inset-0 opacity-[0.04] bg-cover bg-center pointer-events-none -z-20 animate-zoom-fade"
+          style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1531206715517-5c161743ede5?auto=format&fit=crop&w=1600&q=80")' }}
         />
-        
+
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-16 items-center">
           <div className="lg:col-span-7 flex flex-col gap-6">
             <div className="inline-flex items-center gap-2 self-start bg-emerald/10 text-emerald px-3 py-1.5 rounded-full text-xs font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald animate-ping" />
               DevCareer × Nomba Hackathon 2026 Submission
             </div>
-            
+
             <h1 className="font-serif text-4xl sm:text-7xl font-bold tracking-tight leading-[1.05] text-forest">
               Community Finance, <br />
               <span className="bg-gradient-to-r from-forest to-emerald bg-clip-text text-transparent italic font-normal">Reimagined.</span>
             </h1>
-            
+
             <p className="text-lg leading-relaxed text-moss max-w-xl">
               Digitalizing the traditional African rotating savings circle (Ajo / Esusu). Track group contributions, automate cycle payouts, and build a verified financial reputation—without manual spreadsheets or reminder stress.
             </p>
@@ -272,11 +272,11 @@ export default function Home() {
           {/* Hero Visual: fully interactive Ajo Circle with Dashboard Node */}
           <div className="lg:col-span-5 flex justify-center items-center relative animate-float-slow">
             <div className="relative w-80 h-80 sm:w-96 sm:h-96 rounded-full flex items-center justify-center border border-forest/10 bg-white/40 backdrop-blur-sm shadow-md">
-              
+
               {/* Outer Radial Ring Lines - slowly spinning */}
               <div className="absolute inset-4 border border-dashed border-forest/15 rounded-full animate-spin-slow" />
               <div className="absolute inset-12 border border-forest/5 rounded-full" />
-              
+
               {/* Central Information Widget - Dynamically displaying details of the selected member! */}
               <div className="z-10 text-center max-w-[170px] bg-canvas/90 p-4 rounded-2xl shadow-md border border-forest/10 transition-all duration-300">
                 <span className="text-[7px] tracking-widest text-moss uppercase font-bold block mb-1">Circle Member</span>
@@ -298,7 +298,7 @@ export default function Home() {
 
               {/* Positioned Member Avatars (Interactive selection) */}
               {membersData.map((member, i) => {
-                const radius = 140; 
+                const radius = 140;
                 const x = Math.cos((270 + member.id * 45) * Math.PI / 180) * radius;
                 const y = Math.sin((270 + member.id * 45) * Math.PI / 180) * radius;
                 const isSelected = selectedMember === member.id;
@@ -315,18 +315,17 @@ export default function Home() {
                   >
                     <div className="relative">
                       {/* Avatar Image container */}
-                      <img 
-                        src={member.img} 
-                        alt={member.label} 
-                        className={`w-10 h-10 rounded-full object-cover border-2 shadow-md transition-all duration-300 ${
-                          isSelected
+                      <img
+                        src={member.img}
+                        alt={member.label}
+                        className={`w-10 h-10 rounded-full object-cover border-2 shadow-md transition-all duration-300 ${isSelected
                             ? "border-emerald ring-4 ring-emerald/25 scale-110"
                             : member.status === "paid"
-                            ? "border-forest hover:border-forest"
-                            : member.status === "active"
-                            ? "border-emerald ring-2 ring-emerald/10"
-                            : "border-forest/20 hover:border-forest/40"
-                        }`}
+                              ? "border-forest hover:border-forest"
+                              : member.status === "active"
+                                ? "border-emerald ring-2 ring-emerald/10"
+                                : "border-forest/20 hover:border-forest/40"
+                          }`}
                       />
                       {/* Overlay verification status badge */}
                       {member.status === "paid" && (
@@ -344,7 +343,7 @@ export default function Home() {
                         </div>
                       )}
                     </div>
-                    
+
                     <span className="absolute top-11 bg-ink text-canvas text-[8px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-40 shadow-md">
                       {member.label} (Score: {member.score})
                     </span>
@@ -414,17 +413,17 @@ export default function Home() {
       {/* Trust & Reliability Score Section */}
       <section id="trust" className="py-24 border-t border-forest/5">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-16 items-center">
-          
+
           {/* Card Mockup representing a premium app screen UI (Flat minimal style) */}
           <div className="lg:col-span-5 flex justify-center">
             <Reveal className="w-full max-w-sm">
               <div className="bg-white border border-forest/10 rounded-2xl p-8 shadow-sm relative overflow-hidden transition-all duration-500 hover:shadow-md hover:border-forest/20 group">
                 <div className="absolute top-0 right-0 w-24 h-24 bg-forest/5 rounded-bl-full transition-transform duration-700 group-hover:scale-110" />
-                
+
                 <div className="flex items-center gap-4 mb-6">
-                  <img 
-                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80" 
-                    alt="Kazim Alao portrait avatar" 
+                  <img
+                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80"
+                    alt="Kazim Alao portrait avatar"
                     className="w-12 h-12 rounded-full object-cover border border-forest/10 shadow-sm transition-transform duration-500 group-hover:scale-105"
                   />
                   <div>
@@ -476,7 +475,7 @@ export default function Home() {
                 Traditional Ajo groups survive on mutual trust, but friction occurs when someone defaults or pays late. Qova translates this trust into a digital score, rewarding early contributors and holding late players accountable.
               </p>
             </Reveal>
-            
+
             {/* Trust Tiers (Minimal Flat) */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-2">
               <Reveal delay={0} className="border-t border-forest/15 pt-4 group">
@@ -510,20 +509,20 @@ export default function Home() {
           </Reveal>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-stretch">
-            
+
             {/* Calculator controls - Left */}
             <div className="lg:col-span-6 flex flex-col justify-center gap-8 bg-white border border-forest/10 p-8 rounded-2xl shadow-sm">
-              
+
               {/* Slider 1: Contribution Amount */}
               <div className="flex flex-col gap-3">
                 <div className="flex justify-between items-center text-sm font-semibold">
                   <span className="text-forest">Cycle Contribution</span>
                   <span className="font-mono text-emerald">₦{calcContribution.toLocaleString()}</span>
                 </div>
-                <input 
-                  type="range" 
-                  min={5000} 
-                  max={200000} 
+                <input
+                  type="range"
+                  min={5000}
+                  max={200000}
                   step={5000}
                   value={calcContribution}
                   onChange={(e) => setCalcContribution(Number(e.target.value))}
@@ -538,10 +537,10 @@ export default function Home() {
                   <span className="text-forest">Circle Members</span>
                   <span className="font-mono text-emerald">{calcMembers} Slots</span>
                 </div>
-                <input 
-                  type="range" 
-                  min={4} 
-                  max={20} 
+                <input
+                  type="range"
+                  min={4}
+                  max={20}
                   step={1}
                   value={calcMembers}
                   onChange={(e) => setCalcMembers(Number(e.target.value))}
@@ -558,11 +557,10 @@ export default function Home() {
                     <button
                       key={tier}
                       onClick={() => setCalcTier(tier)}
-                      className={`py-2 px-3 text-xs font-semibold rounded-xl border text-center transition-all cursor-pointer ${
-                        calcTier === tier 
-                          ? "bg-forest border-forest text-canvas shadow-sm" 
+                      className={`py-2 px-3 text-xs font-semibold rounded-xl border text-center transition-all cursor-pointer ${calcTier === tier
+                          ? "bg-forest border-forest text-canvas shadow-sm"
                           : "bg-white border-forest/15 text-moss hover:bg-forest/5"
-                      }`}
+                        }`}
                     >
                       {tier} ({feePercentages[tier]}%)
                     </button>
@@ -575,7 +573,7 @@ export default function Home() {
             {/* Calculations Dashboard output - Right */}
             <div className="lg:col-span-6 flex flex-col justify-between bg-forest text-canvas p-8 rounded-2xl shadow-md relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full transition-all duration-500 group-hover:scale-105" />
-              
+
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] uppercase tracking-widest text-canvas/50 font-bold font-mono">Calculated Returns</span>
                 <h3 className="font-serif text-2xl font-semibold italic text-emerald-300">Ajo Pot Structure</h3>
@@ -619,9 +617,9 @@ export default function Home() {
                   &ldquo;Managing our 10-person weekly Ajo used to be a nightmare of tracking receipts and reminding members on WhatsApp. With Qova, contributions are collected via direct virtual transfer and payouts go straight to our banks. The reliability score has eliminated late payments completely.&rdquo;
                 </p>
                 <div className="flex items-center gap-3">
-                  <img 
-                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&h=150&q=80" 
-                    alt="Amina Bello avatar" 
+                  <img
+                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&h=150&q=80"
+                    alt="Amina Bello avatar"
                     className="w-10 h-10 rounded-full object-cover border border-forest/5 shadow-sm group-hover:scale-105 transition-transform"
                   />
                   <div>
@@ -667,10 +665,10 @@ export default function Home() {
           <div className="relative">
             {/* Connected baseline path for desktop */}
             <div className="absolute top-10 left-[12.5%] right-[12.5%] h-0.5 bg-forest/10 hidden md:block" />
-            
+
             {/* Active connecting progress bar - dynamically moves as activeStep changes */}
-            <div 
-              className="absolute top-10 left-[12.5%] h-0.5 bg-emerald transition-all duration-[1000ms] ease-out hidden md:block" 
+            <div
+              className="absolute top-10 left-[12.5%] h-0.5 bg-emerald transition-all duration-[1000ms] ease-out hidden md:block"
               style={{ width: `${(activeStep / 3) * 75}%` }}
             />
 
@@ -678,32 +676,28 @@ export default function Home() {
               {stepsData.map((step, idx) => {
                 const isActive = idx === activeStep;
                 return (
-                  <div 
-                    key={idx} 
+                  <div
+                    key={idx}
                     onClick={() => setActiveStep(idx)}
                     className="flex flex-col items-center md:items-start text-center md:text-left group cursor-pointer"
                   >
                     {/* Step icon holder */}
-                    <div className={`w-20 h-20 rounded-full bg-white border flex items-center justify-center mb-6 shadow-sm transition-all duration-500 ${
-                      isActive 
-                        ? "border-emerald scale-110 ring-4 ring-emerald/15 shadow-md shadow-emerald/5" 
+                    <div className={`w-20 h-20 rounded-full bg-white border flex items-center justify-center mb-6 shadow-sm transition-all duration-500 ${isActive
+                        ? "border-emerald scale-110 ring-4 ring-emerald/15 shadow-md shadow-emerald/5"
                         : "border-forest/10 group-hover:scale-105 group-hover:border-forest/20"
-                    }`}>
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-500 ${
-                        isActive ? "bg-emerald/10 text-emerald animate-pulse" : "bg-forest/5 text-forest"
                       }`}>
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-500 ${isActive ? "bg-emerald/10 text-emerald animate-pulse" : "bg-forest/5 text-forest"
+                        }`}>
                         {React.cloneElement(step.icon as React.ReactElement<{ className?: string }>, {
                           className: `w-5 h-5 transition-colors duration-500 ${isActive ? "text-emerald" : "text-forest"}`
                         })}
                       </div>
                     </div>
-                    
-                    <span className={`text-[10px] uppercase tracking-widest font-bold mb-2 transition-colors duration-500 ${
-                      isActive ? "text-emerald" : "text-forest/60"
-                    }`}>Step 0{idx + 1}</span>
-                    <h3 className={`font-serif text-lg font-bold mb-2 transition-colors duration-500 ${
-                      isActive ? "text-emerald font-semibold" : "text-forest"
-                    }`}>{step.title}</h3>
+
+                    <span className={`text-[10px] uppercase tracking-widest font-bold mb-2 transition-colors duration-500 ${isActive ? "text-emerald" : "text-forest/60"
+                      }`}>Step 0{idx + 1}</span>
+                    <h3 className={`font-serif text-lg font-bold mb-2 transition-colors duration-500 ${isActive ? "text-emerald font-semibold" : "text-forest"
+                      }`}>{step.title}</h3>
                     <p className="text-xs leading-relaxed text-moss max-w-xs">{step.desc}</p>
                   </div>
                 );
@@ -776,7 +770,7 @@ export default function Home() {
                 const isEven = idx % 2 === 0;
                 return (
                   <div key={idx} className="flex flex-col md:grid md:grid-cols-2 items-center gap-8 md:gap-16 relative">
-                    
+
                     {/* Pulsing Timeline axis node */}
                     <div className="absolute left-1/2 top-8 -translate-x-1/2 w-4 h-4 rounded-full bg-white border-2 border-forest hidden md:flex items-center justify-center z-20">
                       {phase.highlight && (
@@ -785,20 +779,18 @@ export default function Home() {
                     </div>
 
                     {/* Timeline card with scroll reveal */}
-                    <Reveal 
+                    <Reveal
                       delay={idx * 100}
-                      className={`w-full max-w-md ${
-                        isEven ? "md:col-start-1 md:justify-self-end" : "md:col-start-2 md:justify-self-start"
-                      }`}
+                      className={`w-full max-w-md ${isEven ? "md:col-start-1 md:justify-self-end" : "md:col-start-2 md:justify-self-start"
+                        }`}
                     >
                       <div className="bg-white border border-forest/10 p-6 rounded-2xl shadow-sm hover:shadow-md hover:border-forest/20 transition-all duration-300 group">
                         <div className="flex items-center justify-between mb-4">
                           <span className="text-[10px] uppercase font-bold tracking-widest text-forest bg-forest/5 px-2.5 py-1 rounded-full group-hover:bg-forest/10 transition-colors">{phase.quarter}</span>
-                          <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                            phase.highlight ? "bg-emerald/10 text-emerald animate-pulse" : "bg-moss/10 text-moss"
-                          }`}>{phase.status}</span>
+                          <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${phase.highlight ? "bg-emerald/10 text-emerald animate-pulse" : "bg-moss/10 text-moss"
+                            }`}>{phase.status}</span>
                         </div>
-                        
+
                         <h4 className="font-serif text-lg font-bold text-forest mb-3 transition-colors duration-300 group-hover:text-emerald">{phase.title}</h4>
                         <ul className="text-xs text-moss space-y-2 list-disc list-inside">
                           {phase.points.map((pt, ptIdx) => (
@@ -816,11 +808,116 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Mobile App Showcase Section */}
+      <section className="py-24 border-t border-forest/5 bg-white/40 overflow-hidden relative">
+        {/* Decorative mesh glows */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-glow-emerald rounded-full -z-10 animate-drift" />
+
+        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-16 items-center">
+
+          <div className="lg:col-span-6 flex flex-col gap-6">
+            <Reveal className="flex flex-col gap-4">
+              <div className="text-xs uppercase tracking-widest font-bold text-emerald bg-emerald/10 self-start px-3 py-1 rounded-full shadow-sm">
+                Mobile Showcase
+              </div>
+              <h2 className="font-serif text-3xl sm:text-5xl font-bold tracking-tight text-forest leading-tight">
+                Your Ajo circles, now on the go
+              </h2>
+              <p className="text-moss leading-relaxed">
+                Take Qova with you anywhere. Our mobile app provides the ultimate companion to manage your rotating savings. Create group circles, monitor participant contributions, track your real-time trust score, and experience the convenience of fully automated cycle payouts.
+              </p>
+            </Reveal>
+
+            {/* Mobile App Key Value Props */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-4">
+              <Reveal delay={100} className="flex gap-3 items-start">
+                <div className="w-8 h-8 rounded-lg bg-emerald/10 text-emerald flex items-center justify-center shrink-0 mt-0.5">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="font-serif font-bold text-forest text-sm">Elegant Native Design</h4>
+                  <p className="text-xs text-moss mt-1">Sleek, fluid interfaces built natively for iOS and Android.</p>
+                </div>
+              </Reveal>
+
+              <Reveal delay={200} className="flex gap-3 items-start">
+                <div className="w-8 h-8 rounded-lg bg-emerald/10 text-emerald flex items-center justify-center shrink-0 mt-0.5">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.02 6.02 0 00-4.902-5.903m0 0A3.002 3.002 0 0013 3a3 3 0 00-3 9v3m10 18a3 3 0 01-3 3h-3.098c-.488-1.121-1.637-2-2.902-2s-2.414.879-2.902 2H3a3 3 0 01-3-3V11a9 9 0 019-9v3.098c1.121.488 2 1.637 2 2.902s-.879 2.414-2 2.902V21a6.002 6.002 0 006-6v-3a3 3 0 00-3-3z" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="font-serif font-bold text-forest text-sm">Instant Push Notifications</h4>
+                  <p className="text-xs text-moss mt-1">Get notified of payments, incoming collections, and successful payouts.</p>
+                </div>
+              </Reveal>
+            </div>
+
+            {/* Badge Buttons */}
+            <Reveal delay={300} className="flex flex-wrap gap-4 mt-6">
+              <div className="flex items-center gap-3 bg-forest text-canvas px-5 py-2.5 rounded-xl shadow-sm border border-white/10 hover:bg-forest-hover transition-colors cursor-pointer group hover-shine">
+                <svg className="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C3.79 16.3 3.4 9.9 7.02 9.77c1.37.05 2.18.6 2.92.58 1.13-.02 1.63-.58 3.19-.58 1.54.02 2.37.58 3.25 1.43-3.23 1.9-2.73 6.13.52 7.42-.65 1.58-1.57 3.16-2.58 4.2h.02a28.9 28.9 0 01-1.37-2.54zM12.03 9.4c-.06-2.87 2.18-5.32 4.95-5.4.3 2.95-2.3 5.4-4.95 5.4z" />
+                </svg>
+                <div className="text-left">
+                  <div className="text-[9px] opacity-60 uppercase tracking-wider font-mono">Download on the</div>
+                  <div className="text-xs font-semibold">App Store</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 bg-forest text-canvas px-5 py-2.5 rounded-xl shadow-sm border border-white/10 hover:bg-forest-hover transition-colors cursor-pointer group hover-shine">
+                <svg className="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M5.25 3.5a1.2 1.2 0 0 0-1.12.83l9.44 9.45 2.65-2.65L5.25 3.5zM3.5 5.25a1.2 1.2 0 0 0-.5 1v11.5a1.2 1.2 0 0 0 .5 1l6.75-6.75L3.5 5.25zM11.25 13.5l6.75 6.75c.35-.25.5-.7.5-1.15a1.2 1.2 0 0 0-.5-1l-6.75-5.6zM18.75 9.75c0-.4-.15-.8-.5-1.05l-5.6 4.7 5.6 5.6c.35-.35.5-.85.5-1.25v-8z" />
+                </svg>
+                <div className="text-left">
+                  <div className="text-[9px] opacity-60 uppercase tracking-wider font-mono">Get it on</div>
+                  <div className="text-xs font-semibold">Google Play</div>
+                </div>
+              </div>
+            </Reveal>
+          </div>
+
+          {/* Dual Mockup Visual */}
+          <div className="lg:col-span-6 flex justify-center items-center relative min-h-[420px] sm:min-h-[500px]">
+            {/* Elegant Phone Frames side-by-side with staggered elevations */}
+            <div className="flex gap-6 sm:gap-8 justify-center items-center w-full max-w-lg">
+
+              {/* Phone 1 */}
+              <Reveal delay={100} className="w-[180px] sm:w-[220px] transform hover:scale-105 transition-transform duration-500">
+                <div className="bg-forest border-[6px] border-forest rounded-[36px] shadow-2xl overflow-hidden relative aspect-[9/19.5]">
+                  <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-16 h-3.5 bg-forest rounded-full z-20" />
+                  <img
+                    src="/WhatsApp Image 2026-06-13 at 10.15.31 PM.jpeg"
+                    alt="Qova Native App Screen 1"
+                    className="w-full h-full object-cover rounded-[28px] relative z-10"
+                  />
+                </div>
+              </Reveal>
+
+              {/* Phone 2 */}
+              <Reveal delay={300} className="w-[180px] sm:w-[220px] transform translate-y-8 hover:scale-105 transition-transform duration-500">
+                <div className="bg-forest border-[6px] border-forest rounded-[36px] shadow-2xl overflow-hidden relative aspect-[9/19.5]">
+                  <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-16 h-3.5 bg-forest rounded-full z-20" />
+                  <img
+                    src="/WhatsApp Image 2026-06-13 at 10.15.36 PM.jpeg"
+                    alt="Qova Native App Screen 2"
+                    className="w-full h-full object-cover rounded-[28px] relative z-10"
+                  />
+                </div>
+              </Reveal>
+
+            </div>
+          </div>
+
+        </div>
+      </section>
+
       {/* Infrastructure Section (The Power of Nomba) */}
       <section id="nomba" className="py-24 border-t border-forest/5">
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-center">
-            
+
             <div className="lg:col-span-5 flex flex-col gap-6">
               <Reveal className="flex flex-col gap-4">
                 <span className="text-xs uppercase tracking-widest font-bold text-emerald bg-emerald/10 self-start px-3 py-1.5 rounded-full shadow-sm">Integrations Engine</span>
@@ -896,9 +993,8 @@ export default function Home() {
                       <span className="text-lg text-moss shrink-0 ml-4 transition-transform duration-300">{isOpen ? "−" : "+"}</span>
                     </button>
                     {/* Collapsible content with smooth height transition */}
-                    <div className={`transition-all duration-500 ease-in-out ${
-                      isOpen ? "max-h-[200px] opacity-100 border-t border-forest/5" : "max-h-0 opacity-0 pointer-events-none"
-                    }`}>
+                    <div className={`transition-all duration-500 ease-in-out ${isOpen ? "max-h-[200px] opacity-100 border-t border-forest/5" : "max-h-0 opacity-0 pointer-events-none"
+                      }`}>
                       <div className="p-5">
                         <p className="text-sm leading-relaxed text-moss">{faq.a}</p>
                       </div>

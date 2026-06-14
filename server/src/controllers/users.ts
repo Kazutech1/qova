@@ -23,3 +23,28 @@ export async function getMeHandler(req: AuthRequest, res: Response) {
 
   res.json({ success: true, data: { user }, message: 'Profile retrieved' });
 }
+
+export async function getMyCirclesHandler(req: AuthRequest, res: Response) {
+  const memberships = await prisma.membership.findMany({
+    where: { user_id: req.userId },
+    include: {
+      circle: {
+        include: {
+          admin: { select: { id: true, name: true } },
+          _count: { select: { memberships: true } },
+        },
+      },
+    },
+    orderBy: { joined_at: 'desc' },
+  });
+
+  const current = memberships
+    .filter(m => m.circle.status === 'PENDING' || m.circle.status === 'ACTIVE')
+    .map(m => ({ ...m.circle, slot_number: m.slot_number, joined_at: m.joined_at }));
+
+  const past = memberships
+    .filter(m => m.circle.status === 'COMPLETED')
+    .map(m => ({ ...m.circle, slot_number: m.slot_number, joined_at: m.joined_at }));
+
+  res.json({ success: true, data: { current, past }, message: 'Circles retrieved' });
+}

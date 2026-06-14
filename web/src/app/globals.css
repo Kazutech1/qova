@@ -26,13 +26,27 @@ body {
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 @keyframes float-slow {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-15px) rotate(2deg); }
+
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+
+  50% {
+    transform: translateY(-15px) rotate(2deg);
+  }
 }
 
 @keyframes fadeInUp {
@@ -40,6 +54,7 @@ body {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -47,17 +62,25 @@ body {
 }
 
 @keyframes pulseEmerald {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 0 0 rgba(45, 106, 79, 0.4);
   }
+
   50% {
     box-shadow: 0 0 0 12px rgba(45, 106, 79, 0);
   }
 }
 
 @keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes zoom-fade {
@@ -65,6 +88,7 @@ body {
     transform: scale(1.08);
     opacity: 0;
   }
+
   to {
     transform: scale(1);
     opacity: 0.05;
@@ -72,9 +96,19 @@ body {
 }
 
 @keyframes drift {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(40px, -60px) scale(1.15); }
-  66% { transform: translate(-30px, 30px) scale(0.9); }
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  33% {
+    transform: translate(40px, -60px) scale(1.15);
+  }
+
+  66% {
+    transform: translate(-30px, 30px) scale(0.9);
+  }
 }
 
 .animate-float {
@@ -107,11 +141,11 @@ body {
 
 /* Background mesh glows */
 .bg-glow-forest {
-  background: radial-gradient(circle, rgba(27,67,50,0.12) 0%, rgba(245,242,237,0) 70%);
+  background: radial-gradient(circle, rgba(27, 67, 50, 0.12) 0%, rgba(245, 242, 237, 0) 70%);
 }
 
 .bg-glow-emerald {
-  background: radial-gradient(circle, rgba(45,106,79,0.08) 0%, rgba(245,242,237,0) 70%);
+  background: radial-gradient(circle, rgba(45, 106, 79, 0.08) 0%, rgba(245, 242, 237, 0) 70%);
 }
 
 /* Premium shine hover transition on buttons */
@@ -127,14 +161,12 @@ body {
   left: -150%;
   width: 200%;
   height: 200%;
-  background: linear-gradient(
-    to bottom right,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0) 40%,
-    rgba(255, 255, 255, 0.35) 50%,
-    rgba(255, 255, 255, 0) 60%,
-    rgba(255, 255, 255, 0) 100%
-  );
+  background: linear-gradient(to bottom right,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0) 40%,
+      rgba(255, 255, 255, 0.35) 50%,
+      rgba(255, 255, 255, 0) 60%,
+      rgba(255, 255, 255, 0) 100%);
   transform: rotate(30deg);
   transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }

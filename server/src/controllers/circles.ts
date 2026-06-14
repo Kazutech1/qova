@@ -48,10 +48,11 @@ const createCircleSchema = z.object({
   total_slots: z.number().int().min(2).max(50),
   payout_order_type: z.enum(['AUTO', 'MANUAL']).default('AUTO'),
   start_condition: z.enum(['AUTO', 'MANUAL']).default('AUTO'),
+  start_date: z.string().datetime().optional(),
 });
 
 export async function createCircleHandler(req: AuthRequest, res: Response) {
-  const { name, contribution_amount, frequency, total_slots, payout_order_type, start_condition } =
+  const { name, contribution_amount, frequency, total_slots, payout_order_type, start_condition, start_date } =
     createCircleSchema.parse(req.body);
 
   let invite_code = generateInviteCode();
@@ -69,9 +70,9 @@ export async function createCircleHandler(req: AuthRequest, res: Response) {
       payout_order_type,
       start_condition,
       admin_id: req.userId!,
-      // Circle starts PENDING until start condition is met
       status: 'PENDING',
       payout_order: [req.userId!],
+      start_date: start_date ? new Date(start_date) : null,
     },
   });
 

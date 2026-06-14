@@ -8,6 +8,8 @@ import { requestLogger } from './middleware/logger';
 import authRouter from './routes/auth';
 import usersRouter from './routes/users';
 import circlesRouter from './routes/circles';
+import contributionsRouter from './routes/contributions';
+import payoutsRouter from './routes/payouts';
 import { swaggerSpec } from './utils/swagger';
 
 const app = express();
@@ -28,8 +30,8 @@ app.get('/health', (_req, res) => {
 app.use('/auth', authRouter);
 app.use('/users', usersRouter);
 app.use('/circles', circlesRouter);
-// app.use('/contributions', contributionsRouter);
-// app.use('/payouts', payoutsRouter);
+app.use('/contributions', contributionsRouter);
+app.use('/payouts', payoutsRouter);
 // app.use('/savings', savingsRouter);
 // app.use('/users', usersRouter);
 

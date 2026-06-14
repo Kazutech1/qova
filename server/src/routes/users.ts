@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getMeHandler } from '../controllers/users';
+import { getMeHandler, getMyCirclesHandler } from '../controllers/users';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
@@ -50,5 +50,39 @@ const router = Router();
  *         description: User not found
  */
 router.get('/me', authenticate, getMeHandler);
+
+/**
+ * @swagger
+ * /users/me/circles:
+ *   get:
+ *     summary: Get all circles the user is in — current and past
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Returns current (PENDING/ACTIVE) and past (COMPLETED) circles
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     current:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                     past:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                 message: { type: string }
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/me/circles', authenticate, getMyCirclesHandler);
 
 export default router;

@@ -102,3 +102,27 @@ Webhooks are essential for verifying payment completion asynchronously.
 | **Virtual Accounts** | Creating cycle-specific dynamic virtual bank accounts to allow direct bank transfer contributions. | `POST /v1/accounts/virtual` |
 | **Transfers API** | Automatic distribution of the cycle's collected pot to the slot recipient. | `POST /v2/transfers/bank` |
 | **Account Lookup** | Validating members' bank details before they join a circle or receive payouts. | `POST /v1/transfers/bank/lookup` |
+
+
+
+
+
+
+
+Right here:
+
+Name	Phone
+Emeka Okafor	2348011111111
+Amaka Nwosu	2348022222222
+Tunde Balogun	2348033333333
+Ngozi Eze	2348044444444
+Chidi Obiora	2348055555555
+Fatima Aliyu	2348066666666
+Seun Adeyemi	2348077777777
+Blessing Okonkwo	2348088888888
+Uche Nnamdi	2348099999999
+Kemi Fashola	2348100000000
+OTP for all: 123456
+
+
+LE-4010-12
