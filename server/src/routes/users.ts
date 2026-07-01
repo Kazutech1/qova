@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getMeHandler, getMyCirclesHandler } from '../controllers/users';
+import { getMeHandler, getMyCirclesHandler, getReliabilityScoreHandler } from '../controllers/users';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
@@ -84,5 +84,39 @@ router.get('/me', authenticate, getMeHandler);
  *         description: Unauthorized
  */
 router.get('/me/circles', authenticate, getMyCirclesHandler);
+
+/**
+ * @swagger
+ * /users/me/reliability:
+ *   get:
+ *     summary: Get the authenticated user's reliability score and breakdown
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Reliability score with label and contribution breakdown
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     score: { type: number, example: 65 }
+ *                     label: { type: string, example: "Good" }
+ *                     breakdown:
+ *                       type: object
+ *                       properties:
+ *                         contributions_paid: { type: number }
+ *                         late_or_missed: { type: number }
+ *                         pots_completed: { type: number }
+ *                 message: { type: string }
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/me/reliability', authenticate, getReliabilityScoreHandler);
 
 export default router;

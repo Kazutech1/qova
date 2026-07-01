@@ -3,7 +3,7 @@ import { AuthRequest } from '../middleware/auth';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { sendOTP, verifyOTP } from '../services/otp';
-import { lookupBankAccount } from '../services/nomba';
+import { lookupBankAccount, getBanks } from '../services/nomba';
 import prisma from '../utils/prisma';
 import { AppError } from '../middleware/errorHandler';
 
@@ -28,7 +28,7 @@ export async function verifyOtpHandler(req: Request, res: Response) {
 
   const user = await prisma.user.upsert({
     where: { phone },
-    create: { phone, name: '' },
+    create: { phone, name: '', reliability_score: 50 },
     update: {},
   });
 
@@ -44,7 +44,19 @@ export async function verifyOtpHandler(req: Request, res: Response) {
 export async function completeProfileHandler(req: AuthRequest, res: Response) {
   const { bank_account_number, bank_code } = completeProfileSchema.parse(req.body);
 
-  const lookup = await lookupBankAccount(bank_account_number, bank_code);
+  let lookup;
+  try {
+    lookup = await lookupBankAccount(bank_account_number, bank_code);
+  } catch {
+    return res.status(400).json({ success: false, data: null, message: 'Bank account not found. Please check your account number and bank.' });
+  }
+
+  // Nomba lookup doesn't always return bankName — fall back to the banks list
+  let bankName = lookup.bankName;
+  if (!bankName) {
+    const banks = await getBanks();
+    bankName = banks.find(b => b.code === bank_code)?.name ?? '';
+  }
 
   const user = await prisma.user.update({
     where: { id: req.userId },
@@ -52,7 +64,7 @@ export async function completeProfileHandler(req: AuthRequest, res: Response) {
       name: lookup.accountName,
       bank_account_number,
       bank_code,
-      bank_name: lookup.bankCode,
+      bank_name: bankName,
     },
   });
 

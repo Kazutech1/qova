@@ -4,6 +4,7 @@ import { AuthRequest } from '../middleware/auth';
 import prisma from '../utils/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { createVirtualAccount } from '../services/nomba';
+import { bumpScore } from '../utils/score';
 import { checkAndTriggerPayout } from '../services/payout';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -172,13 +173,8 @@ async function processPayment(accountRef: string) {
     },
   });
 
-  // Restore 5 reliability points if they paid after being marked late
-  if (wasLate) {
-    await prisma.user.update({
-      where: { id: contribution.user_id },
-      data: { reliability_score: { increment: 5 } },
-    });
-  }
+  // +5 for on-time payment, +2 partial credit for late recovery — capped at 100
+  await bumpScore(contribution.user_id, wasLate ? 2 : 5);
 
   // Anchor cycle_started_at on the very first payment in this circle
   if (!contribution.circle.cycle_started_at) {

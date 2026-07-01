@@ -14,7 +14,7 @@ model User {
   bank_account_number String?
   bank_code           String?
   bank_name           String?
-  reliability_score   Int            @default(100)
+  reliability_score   Int            @default(50)
   bvn_verified        Boolean        @default(false)
   created_at          DateTime       @default(now())
   updated_at          DateTime       @updatedAt

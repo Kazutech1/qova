@@ -10,6 +10,7 @@ import usersRouter from './routes/users';
 import circlesRouter from './routes/circles';
 import contributionsRouter from './routes/contributions';
 import payoutsRouter from './routes/payouts';
+import banksRouter from './routes/banks';
 import { swaggerSpec } from './utils/swagger';
 
 const app = express();
@@ -32,6 +33,7 @@ app.use('/users', usersRouter);
 app.use('/circles', circlesRouter);
 app.use('/contributions', contributionsRouter);
 app.use('/payouts', payoutsRouter);
+app.use('/banks', banksRouter);
 // app.use('/savings', savingsRouter);
 // app.use('/users', usersRouter);
 

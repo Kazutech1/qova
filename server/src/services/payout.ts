@@ -1,6 +1,7 @@
 import prisma from '../utils/prisma';
 import { bankTransfer } from './nomba';
 import { sendWhatsAppMessage } from './whatsapp';
+import { bumpScore } from '../utils/score';
 
 export async function checkAndTriggerPayout(circleId: string) {
   const circle = await prisma.circle.findUnique({
@@ -63,6 +64,9 @@ export async function checkAndTriggerPayout(circleId: string) {
       where: { circle_id: circleId, user_id: recipientId },
       data: { has_received_payout: true },
     });
+
+    // +10 reliability for every member who contributed this cycle
+    await Promise.all(contributions.map(c => bumpScore(c.user_id, 10)));
 
     const isLastCycle = circle.current_cycle >= circle.total_slots;
 

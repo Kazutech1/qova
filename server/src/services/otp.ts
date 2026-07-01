@@ -13,7 +13,16 @@ export async function sendOTP(phone: string) {
 
   await prisma.oTP.create({ data: { phone, code, expires_at } });
 
-  await sendWhatsAppMessage(phone, `Your Qova verification code is *${code}*. It expires in ${OTP_TTL_MINUTES} minutes.`);
+  console.log(`\n======================================================`);
+  console.log(`[OTP] Generated verification code for ${phone}: ${code}`);
+  console.log(`======================================================\n`);
+
+  try {
+    await sendWhatsAppMessage(phone, `Your Qova verification code is *${code}*. It expires in ${OTP_TTL_MINUTES} minutes.`);
+  } catch (err: any) {
+    console.error(`[WhatsApp] Failed to send OTP to ${phone}:`, err.message);
+    console.log(`[OTP] Note: Falling back to console-only OTP delivery.`);
+  }
 }
 
 export async function verifyOTP(phone: string, code: string): Promise<boolean> {
