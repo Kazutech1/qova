@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { sendOtpHandler, verifyOtpHandler, completeProfileHandler } from '../controllers/auth';
+import { sendOtpHandler, verifyOtpHandler, completeProfileHandler, whatsappStatusHandler, whatsappReconnectHandler } from '../controllers/auth';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
@@ -140,5 +140,29 @@ router.post('/verify-otp', verifyOtpHandler);
  *         description: Unauthorized
  */
 router.post('/complete-profile', authenticate, completeProfileHandler);
+
+/**
+ * @swagger
+ * /auth/whatsapp/status:
+ *   get:
+ *     summary: Check WhatsApp bot connection status
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Current connection state
+ */
+router.get('/whatsapp/status', whatsappStatusHandler);
+
+/**
+ * @swagger
+ * /auth/whatsapp/reconnect:
+ *   post:
+ *     summary: Trigger a manual WhatsApp reconnect
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Reconnect initiated — check server logs for pairing code if needed
+ */
+router.post('/whatsapp/reconnect', whatsappReconnectHandler);
 
 export default router;

@@ -1,4 +1,22 @@
 import prisma from '../utils/prisma';
+import { checkAndTriggerPayout } from './payout';
+
+// Sweeps all active circles and triggers payout for any where all members have paid
+export async function runPayoutSweep() {
+  const activeCircles = await prisma.circle.findMany({
+    where: { status: 'ACTIVE' },
+    select: { id: true, name: true },
+  });
+
+  if (activeCircles.length === 0) return;
+
+  console.log(`[Cron] Payout sweep — checking ${activeCircles.length} active circle(s)...`);
+  for (const circle of activeCircles) {
+    await checkAndTriggerPayout(circle.id).catch(err =>
+      console.error(`[Cron] Payout sweep failed for ${circle.name}:`, err.message)
+    );
+  }
+}
 
 // Runs daily — marks overdue contributions LATE and deducts 1 reliability point per day overdue
 export async function runDailyContributionCheck() {

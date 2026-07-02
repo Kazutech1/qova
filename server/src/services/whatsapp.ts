@@ -111,6 +111,14 @@ export async function initWhatsApp() {
   });
 }
 
+export function getWhatsAppStatus(): { connected: boolean; ready: boolean } {
+  return { connected: sock !== null, ready: isReady };
+}
+
+export async function reconnectWhatsApp(): Promise<void> {
+  await initWhatsApp();
+}
+
 export async function sendWhatsAppMessage(phone: string, message: string) {
   if (!sock || !isReady) throw new Error('WhatsApp not connected');
   // Ensure the JID is international format, without spaces or "+" prefix

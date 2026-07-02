@@ -152,10 +152,15 @@ export async function createVirtualAccount(params: {
   expiryDate: string;
   expectedAmount: string;
 }): Promise<VirtualAccountResult> {
-  const res = await fetchJson<{ code: string; data: Record<string, string> }>(
+  const res = await fetchJson<{ code: string; description?: string; data: Record<string, string> }>(
     '/v1/accounts/virtual',
     params
   );
+
+  if (!res.data) {
+    throw new Error(`Nomba virtual account error (code ${res.code}): ${res.description ?? 'no data returned'}`);
+  }
+
   const d = res.data;
   return {
     accountNumber: d.bankAccountNumber ?? d.accountNumber ?? d.account_number ?? '',

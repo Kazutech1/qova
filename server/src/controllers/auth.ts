@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/auth';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { sendOTP, verifyOTP } from '../services/otp';
+import { getWhatsAppStatus, reconnectWhatsApp } from '../services/whatsapp';
 import { lookupBankAccount, getBanks } from '../services/nomba';
 import prisma from '../utils/prisma';
 import { AppError } from '../middleware/errorHandler';
@@ -39,6 +40,16 @@ export async function verifyOtpHandler(req: Request, res: Response) {
     data: { token, user: { id: user.id, phone: user.phone, name: user.name } },
     message: 'Verified successfully',
   });
+}
+
+export async function whatsappStatusHandler(_req: Request, res: Response) {
+  const status = getWhatsAppStatus();
+  res.json({ success: true, data: status, message: status.ready ? 'WhatsApp connected' : 'WhatsApp not ready' });
+}
+
+export async function whatsappReconnectHandler(_req: Request, res: Response) {
+  res.json({ success: true, data: null, message: 'Reconnecting WhatsApp...' });
+  reconnectWhatsApp().catch(err => console.error('[WhatsApp] Manual reconnect failed:', err));
 }
 
 export async function completeProfileHandler(req: AuthRequest, res: Response) {

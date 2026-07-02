@@ -3,6 +3,7 @@ import {
   createCircleHandler,
   getCircleHandler,
   joinCircleHandler,
+  getCircleByInviteHandler,
   startCircleHandler,
   setPayoutOrderHandler,
   getCircleMembersHandler,
@@ -93,6 +94,28 @@ router.post('/', authenticate, createCircleHandler);
  *         description: Invalid invite code
  */
 router.post('/join', authenticate, joinCircleHandler);
+
+/**
+ * @swagger
+ * /circles/by-invite/{invite_code}:
+ *   get:
+ *     summary: Get circle details by invite code (pre-join check)
+ *     tags: [Circles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: invite_code
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Circle details
+ *       404:
+ *         description: Invalid invite code
+ */
+router.get('/by-invite/:invite_code', authenticate, getCircleByInviteHandler);
 
 /**
  * @swagger

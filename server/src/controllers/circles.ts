@@ -123,6 +123,31 @@ export async function getCircleHandler(req: AuthRequest, res: Response) {
   });
 }
 
+// ─── Lookup by Invite Code ───────────────────────────────────────────────────
+
+export async function getCircleByInviteHandler(req: AuthRequest, res: Response) {
+  const { invite_code } = req.params;
+
+  const circle = await prisma.circle.findUnique({
+    where: { invite_code },
+    include: {
+      admin: { select: { id: true, name: true, phone: true } },
+      memberships: { select: { user_id: true } },
+    },
+  });
+
+  if (!circle) throw new AppError('Invalid invite code', 404);
+
+  const members_count = circle.memberships.length;
+  const { memberships, ...circleData } = circle;
+
+  res.json({
+    success: true,
+    data: { circle: { ...circleData, members_count } },
+    message: 'Circle retrieved by invite code',
+  });
+}
+
 // ─── Join ─────────────────────────────────────────────────────────────────────
 
 const joinCircleSchema = z.object({ invite_code: z.string().min(1) });

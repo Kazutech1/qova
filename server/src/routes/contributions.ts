@@ -3,6 +3,7 @@ import {
   payContributionHandler,
   webhookHandler,
   simulatePaymentHandler,
+  simulateAllPaymentsHandler,
   getContributionsHandler,
 } from '../controllers/contributions';
 import { authenticate } from '../middleware/auth';
@@ -80,6 +81,28 @@ router.post('/webhook', webhookHandler);
  *         description: No pending contribution found for that ref
  */
 router.post('/simulate-payment', simulatePaymentHandler);
+
+/**
+ * @swagger
+ * /contributions/simulate-all:
+ *   post:
+ *     summary: Simulate all member payments for the current cycle (dev only)
+ *     tags: [Contributions]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [circle_id]
+ *             properties:
+ *               circle_id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: All contributions marked as PAID, payout triggered
+ */
+router.post('/simulate-all', simulateAllPaymentsHandler);
 
 /**
  * @swagger

@@ -90,9 +90,12 @@ export async function payContributionHandler(req: AuthRequest, res: Response) {
   // Expiry = due date + 24hr grace
   const expiryDate = addDays(dueDate, 1);
 
+  // Nomba rejects special characters in account names
+  const safeCircleName = circle.name.replace(/[^a-zA-Z0-9 ]/g, '').trim();
+
   const virtualAccount = await createVirtualAccount({
     accountRef,
-    accountName: `Qova Ajo - ${circle.name}`,
+    accountName: `Qova ${safeCircleName}`,
     expiryDate: formatNombaDate(expiryDate),
     expectedAmount: koboCToNaira(circle.contribution_amount),
   });
@@ -128,15 +131,29 @@ export async function payContributionHandler(req: AuthRequest, res: Response) {
 // ─── POST /contributions/webhook ──────────────────────────────────────────────
 
 export async function webhookHandler(req: Request, res: Response) {
-  const { event, data } = req.body;
+  // Log full payload so we can confirm Nomba's exact field names on first delivery
+  console.log('[Webhook] Nomba payload:', JSON.stringify(req.body, null, 2));
 
   // Acknowledge immediately so Nomba doesn't retry
   res.json({ success: true });
 
-  if (event !== 'payment_success') return;
+  // Nomba may send 'event' or 'event_type'
+  const eventName: string = req.body.event ?? req.body.event_type ?? '';
+  if (eventName !== 'payment_success') return;
 
-  const accountRef: string = data?.accountRef ?? data?.account_ref;
-  if (!accountRef) return;
+  const data = req.body.data ?? {};
+  // Try every known field name for the virtual account reference
+  const accountRef: string =
+    data.accountRef ??
+    data.account_ref ??
+    data.aliasAccountNumber ??
+    data.alias_account_number ??
+    '';
+
+  if (!accountRef) {
+    console.warn('[Webhook] payment_success received but no accountRef found in payload');
+    return;
+  }
 
   await processPayment(accountRef);
 }
@@ -188,6 +205,55 @@ async function processPayment(accountRef: string) {
   setImmediate(() => checkAndTriggerPayout(contribution.circle_id).catch(console.error));
 
   return updated;
+}
+
+// ─── POST /contributions/simulate-all ────────────────────────────────────────
+
+const simulateAllSchema = z.object({ circle_id: z.string() });
+
+export async function simulateAllPaymentsHandler(req: Request, res: Response) {
+  const { circle_id } = simulateAllSchema.parse(req.body);
+
+  const circle = await prisma.circle.findUnique({
+    where: { id: circle_id },
+    include: { memberships: true },
+  });
+  if (!circle) throw new AppError('Circle not found', 404);
+  if (circle.status !== 'ACTIVE') throw new AppError('Circle is not active', 400);
+
+  const results = [];
+
+  for (const member of circle.memberships) {
+    const accountRef = `qova-${circle_id}-${member.user_id}-cycle${circle.current_cycle}`;
+
+    // Ensure a contribution record exists
+    const existing = await prisma.contribution.findUnique({
+      where: { nomba_account_ref: accountRef },
+    });
+
+    if (!existing) {
+      await prisma.contribution.create({
+        data: {
+          user_id:          member.user_id,
+          circle_id,
+          cycle_number:     circle.current_cycle,
+          amount:           circle.contribution_amount,
+          status:           'PENDING',
+          nomba_account_ref: accountRef,
+        },
+      });
+    }
+
+    if (existing?.status === 'PAID') {
+      results.push({ user_id: member.user_id, status: 'already_paid' });
+      continue;
+    }
+
+    await processPayment(accountRef);
+    results.push({ user_id: member.user_id, status: 'simulated' });
+  }
+
+  res.json({ success: true, data: { results }, message: 'All payments simulated' });
 }
 
 // ─── GET /contributions/:circleId ─────────────────────────────────────────────
