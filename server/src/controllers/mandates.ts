@@ -79,6 +79,7 @@ export async function createMandateHandler(req: AuthRequest, res: Response) {
     endDate:               endDate.toISOString(),
     customerEmail:         deriveEmail(user.phone),
     customerPhoneNumber:   user.phone,
+    customerAddress:       'Nigeria', // User model has no address field; Nomba requires non-blank
     narration:             `Qova auto-debit - ${circle.name}`,
   });
 

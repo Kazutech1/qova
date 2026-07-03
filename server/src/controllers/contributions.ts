@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { AuthRequest } from '../middleware/auth';
 import prisma from '../utils/prisma';
 import { AppError } from '../middleware/errorHandler';
-import { createVirtualAccount } from '../services/nomba';
+import { createVirtualAccount, verifyWebhookSignature } from '../services/nomba';
 import {
   markContributionPaid,
   frequencyDays,
@@ -121,20 +121,27 @@ export async function webhookHandler(req: Request, res: Response) {
   // Log full payload so we can confirm Nomba's exact field names on first delivery
   console.log('[Webhook] Nomba payload:', JSON.stringify(req.body, null, 2));
 
+  // Reject anything not signed by Nomba before doing any work
+  if (!verifyWebhookSignature(req.body, req.headers)) {
+    console.warn('[Webhook] Invalid or missing signature — rejected');
+    return res.status(401).json({ success: false, data: null, message: 'Invalid signature' });
+  }
+
   // Acknowledge immediately so Nomba doesn't retry
   res.json({ success: true });
 
-  // Nomba may send 'event' or 'event_type'
-  const eventName: string = req.body.event ?? req.body.event_type ?? '';
+  const eventName: string = req.body.event_type ?? req.body.event ?? '';
   if (eventName !== 'payment_success') return;
 
   const data = req.body.data ?? {};
-  // Try every known field name for the virtual account reference
+  const tx = data.transaction ?? {};
+
+  // The virtual-account reference we set at creation is echoed as aliasAccountReference
   const accountRef: string =
+    tx.aliasAccountReference ??
+    data.aliasAccountReference ??
     data.accountRef ??
     data.account_ref ??
-    data.aliasAccountNumber ??
-    data.alias_account_number ??
     '';
 
   if (!accountRef) {
@@ -142,7 +149,10 @@ export async function webhookHandler(req: Request, res: Response) {
     return;
   }
 
-  await processPayment(accountRef);
+  // Store Nomba's real transaction id for reconciliation (fallback handled downstream)
+  const reference: string | undefined = tx.transactionId ?? data.transactionId ?? undefined;
+
+  await processPayment(accountRef, reference);
 }
 
 // ─── POST /contributions/simulate-payment ─────────────────────────────────────
@@ -158,7 +168,7 @@ export async function simulatePaymentHandler(req: Request, res: Response) {
 
 // ─── Shared payment processing logic ─────────────────────────────────────────
 
-async function processPayment(accountRef: string) {
+async function processPayment(accountRef: string, nombaReference?: string) {
   const contribution = await prisma.contribution.findUnique({
     where: { nomba_account_ref: accountRef },
     include: { circle: true },
@@ -169,7 +179,7 @@ async function processPayment(accountRef: string) {
   const wasLate = contribution.status === 'LATE';
 
   return markContributionPaid(contribution, {
-    nombaReference: `nomba-sim-${Date.now()}`,
+    nombaReference: nombaReference ?? `nomba-sim-${Date.now()}`,
     wasLate,
     paidVia: 'VIRTUAL_ACCOUNT',
   });

@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 const BASE_URL = process.env.NOMBA_BASE_URL ?? 'https://sandbox.nomba.com';
 const ACCOUNT_ID = process.env.NOMBA_ACCOUNT_ID ?? '';
 
@@ -322,6 +324,7 @@ export async function createDirectDebitMandate(params: {
   endDate: string;           // ISO date-time
   customerEmail: string;
   customerPhoneNumber?: string;
+  customerAddress?: string;
   narration?: string;
 }): Promise<CreateMandateResult> {
   const res = await fetchJson<{ responseCode?: string; code?: string; description?: string; data: Record<string, string> }>(
@@ -338,6 +341,7 @@ export async function createDirectDebitMandate(params: {
       endDate:               params.endDate,
       customerEmail:         params.customerEmail,
       customerPhoneNumber:   params.customerPhoneNumber,
+      customerAddress:       params.customerAddress || 'Nigeria', // Nomba requires non-blank
       narration:             params.narration ?? 'Qova Ajo auto-debit mandate',
     }
   );
@@ -401,4 +405,48 @@ export async function updateMandateStatus(
   action: 'SUSPEND' | 'ACTIVE' | 'DELETE'
 ): Promise<void> {
   await fetchJsonPut('/v1/direct-debits/update-status', { mandateId, status: action });
+}
+
+// ─── Webhook Signature Verification ───────────────────────────────────────────
+
+// Verifies the `nomba-signature` header. Nomba signs a colon-joined string of specific
+// payload fields + the `nomba-timestamp` header with HMAC-SHA256 (base64) using the
+// signature key configured on the dashboard.
+// Docs: https://developer.nomba.com/docs/api-basics/webhook
+export function verifyWebhookSignature(
+  body: any,
+  headers: Record<string, string | string[] | undefined>
+): boolean {
+  const key = process.env.NOMBA_WEBHOOK_SIGNATURE_KEY;
+  if (!key) {
+    console.error('[Webhook] NOMBA_WEBHOOK_SIGNATURE_KEY is not set — rejecting all webhooks');
+    return false;
+  }
+
+  const signature = String(headers['nomba-signature'] ?? '');
+  const timestamp = String(headers['nomba-timestamp'] ?? '');
+  if (!signature || !timestamp) return false;
+
+  const data     = body?.data ?? {};
+  const tx       = data.transaction ?? {};
+  const merchant = data.merchant ?? {};
+
+  const signingString = [
+    body?.event_type,
+    body?.requestId,
+    merchant.userId,
+    merchant.walletId,
+    tx.transactionId,
+    tx.type,
+    tx.time,
+    tx.responseCode,
+    timestamp,
+  ].join(':');
+
+  const computed = crypto.createHmac('sha256', key).update(signingString).digest('base64');
+
+  // constant-time comparison (avoids leaking timing info)
+  const a = Buffer.from(computed);
+  const b = Buffer.from(signature);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
