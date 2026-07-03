@@ -24,6 +24,7 @@ model User {
   payouts        Payout[]
   savings_vaults SavingsVault[]
   circles_admin  Circle[]
+  mandates       DirectDebitMandate[]
 }
 
 model Circle {
@@ -43,10 +44,11 @@ model Circle {
   cycle_started_at    DateTime?       // set on first PAID contribution — anchors all due dates
   created_at          DateTime        @default(now())
 
-  admin         User           @relation(fields: [admin_id], references: [id])
+  admin         User                 @relation(fields: [admin_id], references: [id])
   memberships   Membership[]
   contributions Contribution[]
   payouts       Payout[]
+  mandates      DirectDebitMandate[]
 }
 
 model Membership {
@@ -74,6 +76,9 @@ model Contribution {
   nomba_account_ref      String?            @unique // virtual account reference for webhook lookup
   virtual_account_number String?
   virtual_account_bank   String?
+  paid_via               String?            // "VIRTUAL_ACCOUNT" | "AUTO_DEBIT" | "MANUAL"
+  auto_debit_attempts    Int                @default(0)
+  auto_debit_last_attempt DateTime?
   created_at             DateTime           @default(now())
 
   user   User   @relation(fields: [user_id], references: [id])
@@ -91,6 +96,30 @@ model Payout {
 
   circle    Circle @relation(fields: [circle_id], references: [id])
   recipient User   @relation(fields: [recipient_id], references: [id])
+}
+
+model DirectDebitMandate {
+  id                      String        @id @default(auto()) @map("_id") @db.ObjectId
+  user_id                 String        @db.ObjectId
+  circle_id               String        @db.ObjectId
+  nomba_mandate_id        String?       @unique
+  merchant_reference      String        @unique
+  status                  MandateStatus @default(PENDING_ACTIVATION)
+  bank_account_number     String
+  bank_code               String
+  bank_account_name       String
+  amount                  Int           // kobo — per-cycle debit amount
+  frequency               String        // Nomba enum snapshot
+  activation_note         String?       // ₦50 NIBSS instructions for the member
+  last_debit_at           DateTime?
+  failure_count           Int           @default(0)
+  created_at              DateTime      @default(now())
+  updated_at              DateTime      @updatedAt
+
+  user   User   @relation(fields: [user_id], references: [id])
+  circle Circle @relation(fields: [circle_id], references: [id])
+
+  @@unique([user_id, circle_id]) // one mandate per member per circle
 }
 
 model SavingsVault {
@@ -145,4 +174,13 @@ enum ContributionStatus {
   PAID
   LATE
   MISSED
+}
+
+enum MandateStatus {
+  PENDING_ACTIVATION
+  ACTIVE
+  SUSPENDED
+  FAILED
+  REVOKED
+  EXPIRED
 }

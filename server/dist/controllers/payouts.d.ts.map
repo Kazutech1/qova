@@ -1,0 +1,1 @@
+{"version":3,"file":"payouts.d.ts","sourceRoot":"","sources":["../../src/controllers/payouts.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,OAAO,EAAE,QAAQ,EAAE,MAAM,SAAS,CAAC;AAE5C,OAAO,EAAE,WAAW,EAAE,MAAM,oBAAoB,CAAC;AAMjD,wBAAsB,iBAAiB,CAAC,GAAG,EAAE,WAAW,EAAE,GAAG,EAAE,QAAQ,iBAatE;AAKD,wBAAsB,uBAAuB,CAAC,GAAG,EAAE,OAAO,EAAE,GAAG,EAAE,QAAQ,iBAIxE"}

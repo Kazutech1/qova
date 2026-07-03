@@ -13,7 +13,12 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "test": "jest --runInBand",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "balances": "tsx src/scripts/check-balances.ts",
+    "circle:nomba": "tsx src/scripts/check-circle-nomba.ts",
+    "seed:test-circle": "tsx src/scripts/seed-test-circle.ts",
+    "nomba:balances": "tsx src/scripts/nomba-balances.ts",
+    "nomba:txns": "tsx src/scripts/nomba-transactions.ts"
   },
   "jest": {
     "preset": "ts-jest",

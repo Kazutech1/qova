@@ -4,8 +4,12 @@ import { AuthRequest } from '../middleware/auth';
 import prisma from '../utils/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { createVirtualAccount } from '../services/nomba';
-import { bumpScore } from '../utils/score';
-import { checkAndTriggerPayout } from '../services/payout';
+import {
+  markContributionPaid,
+  frequencyDays,
+  addDays,
+  cycleDueDate,
+} from '../services/contribution';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -13,25 +17,8 @@ function koboCToNaira(kobo: number): string {
   return (kobo / 100).toFixed(2);
 }
 
-function frequencyDays(frequency: string): number {
-  if (frequency === 'WEEKLY') return 7;
-  if (frequency === 'BIWEEKLY') return 14;
-  return 30;
-}
-
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
 function formatNombaDate(date: Date): string {
   return date.toISOString().replace('T', ' ').slice(0, 19);
-}
-
-// Due date for a given cycle based on first payment anchor
-function cycleDueDate(cycleStartedAt: Date, frequency: string, cycleNumber: number): Date {
-  return addDays(cycleStartedAt, (cycleNumber - 1) * frequencyDays(frequency));
 }
 
 // ─── POST /contributions/pay ──────────────────────────────────────────────────
@@ -181,30 +168,11 @@ async function processPayment(accountRef: string) {
 
   const wasLate = contribution.status === 'LATE';
 
-  const updated = await prisma.contribution.update({
-    where: { id: contribution.id },
-    data: {
-      status: 'PAID',
-      paid_at: new Date(),
-      nomba_reference: `nomba-sim-${Date.now()}`,
-    },
+  return markContributionPaid(contribution, {
+    nombaReference: `nomba-sim-${Date.now()}`,
+    wasLate,
+    paidVia: 'VIRTUAL_ACCOUNT',
   });
-
-  // +5 for on-time payment, +2 partial credit for late recovery — capped at 100
-  await bumpScore(contribution.user_id, wasLate ? 2 : 5);
-
-  // Anchor cycle_started_at on the very first payment in this circle
-  if (!contribution.circle.cycle_started_at) {
-    await prisma.circle.update({
-      where: { id: contribution.circle_id },
-      data: { cycle_started_at: new Date() },
-    });
-  }
-
-  // Check if all members paid — auto-trigger payout if so
-  setImmediate(() => checkAndTriggerPayout(contribution.circle_id).catch(console.error));
-
-  return updated;
 }
 
 // ─── POST /contributions/simulate-all ────────────────────────────────────────

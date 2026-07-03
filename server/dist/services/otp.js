@@ -15,7 +15,16 @@ async function sendOTP(phone) {
     const code = generateCode();
     const expires_at = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
     await prisma_1.default.oTP.create({ data: { phone, code, expires_at } });
-    await (0, whatsapp_1.sendWhatsAppMessage)(phone, `Your Qova verification code is *${code}*. It expires in ${OTP_TTL_MINUTES} minutes.`);
+    console.log(`\n======================================================`);
+    console.log(`[OTP] Generated verification code for ${phone}: ${code}`);
+    console.log(`======================================================\n`);
+    try {
+        await (0, whatsapp_1.sendWhatsAppMessage)(phone, `Your Qova verification code is *${code}*. It expires in ${OTP_TTL_MINUTES} minutes.`);
+    }
+    catch (err) {
+        console.error(`[WhatsApp] Failed to send OTP to ${phone}:`, err.message);
+        console.log(`[OTP] Note: Falling back to console-only OTP delivery.`);
+    }
 }
 async function verifyOTP(phone, code) {
     const record = await prisma_1.default.oTP.findFirst({

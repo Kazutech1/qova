@@ -9,6 +9,11 @@ import {
   getCircleMembersHandler,
   getCircleHistoryHandler,
 } from '../controllers/circles';
+import {
+  createMandateHandler,
+  getMandateHandler,
+  deleteMandateHandler,
+} from '../controllers/mandates';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
@@ -243,5 +248,63 @@ router.get('/:id/members', authenticate, getCircleMembersHandler);
  *         description: Circle not found
  */
 router.get('/:id/history', authenticate, getCircleHistoryHandler);
+
+/**
+ * @swagger
+ * /circles/{id}/mandate:
+ *   post:
+ *     summary: Member authorises auto-debit (creates a Nomba direct-debit mandate)
+ *     tags: [Circles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       201:
+ *         description: Mandate created — returns activation instructions (₦50 transfer)
+ *       400:
+ *         description: Auto-debit not enabled, missing bank details, or mandate already exists
+ *       403:
+ *         description: Not a member of this circle
+ *   get:
+ *     summary: Get the caller's auto-debit mandate status for this circle
+ *     tags: [Circles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Mandate status (reconciled with Nomba)
+ *       404:
+ *         description: No mandate found for this circle
+ *   delete:
+ *     summary: Member turns off auto-debit (revokes the mandate)
+ *     tags: [Circles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Auto-debit revoked
+ *       404:
+ *         description: No mandate found for this circle
+ */
+router.post('/:id/mandate', authenticate, createMandateHandler);
+router.get('/:id/mandate', authenticate, getMandateHandler);
+router.delete('/:id/mandate', authenticate, deleteMandateHandler);
 
 export default router;

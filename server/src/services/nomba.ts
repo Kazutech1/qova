@@ -76,6 +76,17 @@ async function fetchJson<T>(path: string, body: unknown): Promise<T> {
   return json;
 }
 
+async function fetchJsonPut<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: 'PUT',
+    headers: await authHeaders(),
+    body: JSON.stringify(body),
+  });
+  const json = await res.json() as T;
+  if (!res.ok) throw new Error(`Nomba error ${res.status}: ${JSON.stringify(json)}`);
+  return json;
+}
+
 // ─── Bank Transfer ────────────────────────────────────────────────────────────
 
 export interface BankTransferResult {
@@ -196,6 +207,49 @@ export async function getBanks(): Promise<Bank[]> {
   return results;
 }
 
+// ─── Subaccount Balances ──────────────────────────────────────────────────────
+
+export interface SubaccountBalance {
+  accountId: string;
+  accountName: string;
+  accountNumber: string;
+  bankName: string;
+  balanceKobo: number;
+  balanceNaira: string;
+  currency: string;
+}
+
+function normaliseAccount(a: Record<string, string | number>): SubaccountBalance {
+  const rawBalance  = Number(a.balance ?? a.availableBalance ?? a.available_balance ?? 0);
+  const balanceKobo = Math.round(rawBalance * 100);
+  return {
+    accountId:     String(a.accountId      ?? a.account_id      ?? ACCOUNT_ID),
+    accountName:   String(a.accountName    ?? a.account_name    ?? ''),
+    accountNumber: String(a.accountNumber  ?? a.account_number  ?? ''),
+    bankName:      String(a.bankName       ?? a.bank_name       ?? ''),
+    balanceKobo,
+    balanceNaira:  (balanceKobo / 100).toFixed(2),
+    currency:      String(a.currency ?? 'NGN'),
+  };
+}
+
+export async function getSubaccounts(): Promise<SubaccountBalance[]> {
+  // Fetch subaccounts list + main account balance in parallel
+  const [listRes, mainRes] = await Promise.all([
+    fetchJsonGet<{ code: string; data: { results?: Record<string, string | number>[] } }>('/v1/accounts'),
+    fetchJsonGet<{ code: string; data: Record<string, string | number> }>(`/v1/accounts/${ACCOUNT_ID}`).catch(() => null),
+  ]);
+
+  const subaccounts = (listRes.data?.results ?? []).map(normaliseAccount);
+
+  // Prepend main account if it returned balance data and isn't already in the list
+  if (mainRes?.data && !subaccounts.find(a => a.accountId === ACCOUNT_ID)) {
+    subaccounts.unshift(normaliseAccount({ ...mainRes.data, accountId: ACCOUNT_ID }));
+  }
+
+  return subaccounts;
+}
+
 // ─── Transaction Lookup ───────────────────────────────────────────────────────
 
 export interface TransactionResult {
@@ -216,4 +270,135 @@ export async function getTransaction(reference: string): Promise<TransactionResu
     amount: Number(d.amount ?? 0) * 100, // convert naira back to kobo
     narration: String(d.narration ?? ''),
   };
+}
+
+// ─── Direct Debit Mandates ────────────────────────────────────────────────────
+
+// Maps our Circle.frequency to Nomba's mandate frequency enum
+const FREQUENCY_MAP: Record<string, string> = {
+  WEEKLY:   'WEEKLY',
+  BIWEEKLY: 'EVERY_TWO_WEEKS',
+  MONTHLY:  'MONTHLY',
+};
+
+export function toNombaFrequency(circleFrequency: string): string {
+  return FREQUENCY_MAP[circleFrequency] ?? 'MONTHLY';
+}
+
+export type MandateStatusValue =
+  | 'PENDING_ACTIVATION'
+  | 'ACTIVE'
+  | 'SUSPENDED'
+  | 'FAILED'
+  | 'REVOKED'
+  | 'EXPIRED';
+
+// Normalize Nomba's free-form mandateStatus string (e.g. "Active") to our enum
+function normalizeMandateStatus(raw: string): MandateStatusValue {
+  const s = (raw ?? '').toLowerCase();
+  if (s.includes('active')) return 'ACTIVE';
+  if (s.includes('suspend')) return 'SUSPENDED';
+  if (s.includes('delete') || s.includes('revok')) return 'REVOKED';
+  if (s.includes('expire')) return 'EXPIRED';
+  if (s.includes('reject') || s.includes('fail')) return 'FAILED';
+  return 'PENDING_ACTIVATION';
+}
+
+export interface CreateMandateResult {
+  mandateId: string;
+  merchantReference: string;
+  activationNote: string;
+}
+
+export async function createDirectDebitMandate(params: {
+  customerAccountNumber: string;
+  bankCode: string;
+  customerName: string;
+  customerAccountName: string;
+  amount: number;            // kobo
+  frequency: string;         // Circle.frequency
+  merchantReference: string;
+  startDate: string;         // ISO date-time
+  endDate: string;           // ISO date-time
+  customerEmail: string;
+  customerPhoneNumber?: string;
+  narration?: string;
+}): Promise<CreateMandateResult> {
+  const res = await fetchJson<{ responseCode?: string; code?: string; description?: string; data: Record<string, string> }>(
+    '/v1/direct-debits',
+    {
+      customerAccountNumber: params.customerAccountNumber,
+      bankCode:              params.bankCode,
+      customerName:          params.customerName,
+      customerAccountName:   params.customerAccountName,
+      amount:                params.amount / 100, // Nomba uses naira
+      frequency:             toNombaFrequency(params.frequency),
+      merchantReference:     params.merchantReference,
+      startDate:             params.startDate,
+      endDate:               params.endDate,
+      customerEmail:         params.customerEmail,
+      customerPhoneNumber:   params.customerPhoneNumber,
+      narration:             params.narration ?? 'Qova Ajo auto-debit mandate',
+    }
+  );
+
+  if (!res.data) {
+    throw new Error(`Nomba mandate create error (code ${res.responseCode ?? res.code}): ${res.description ?? 'no data returned'}`);
+  }
+
+  const d = res.data;
+  return {
+    mandateId:         d.mandateId ?? d.mandate_id ?? '',
+    merchantReference: d.merchantReference ?? params.merchantReference,
+    activationNote:    d.description ?? '',
+  };
+}
+
+export interface DebitMandateResult {
+  code: string;
+  status: string;
+  message: string;
+}
+
+export async function debitMandate(mandateId: string, amountKobo: number): Promise<DebitMandateResult> {
+  const res = await fetchJson<{ code: string; description?: string; data: Record<string, string> }>(
+    '/v1/direct-debits/debit-mandate',
+    {
+      mandateId,
+      amount: (amountKobo / 100).toFixed(2), // naira string
+    }
+  );
+  const d = res.data ?? {};
+  return {
+    code:    res.code ?? '',
+    status:  d.status ?? 'UNKNOWN',
+    message: d.message ?? res.description ?? '',
+  };
+}
+
+export interface MandateStatusResult {
+  status: MandateStatusValue;
+  rawStatus: string;
+  rejectionComment: string;
+}
+
+export async function getMandateStatus(mandateId: string): Promise<MandateStatusResult> {
+  const res = await fetchJsonGet<{ code: string; data: Record<string, string> }>(
+    `/v1/direct-debits/status?mandateId=${encodeURIComponent(mandateId)}`
+  );
+  const d = res.data ?? {};
+  const raw = d.mandateStatus ?? '';
+  return {
+    status:           normalizeMandateStatus(raw),
+    rawStatus:        raw,
+    rejectionComment: d.rejectionComment ?? '',
+  };
+}
+
+// action: SUSPEND (pause), ACTIVE (reactivate), DELETE (revoke)
+export async function updateMandateStatus(
+  mandateId: string,
+  action: 'SUSPEND' | 'ACTIVE' | 'DELETE'
+): Promise<void> {
+  await fetchJsonPut('/v1/direct-debits/update-status', { mandateId, status: action });
 }

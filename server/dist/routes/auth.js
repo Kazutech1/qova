@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_1 = require("../controllers/auth");
+const auth_2 = require("../middleware/auth");
 const router = (0, express_1.Router)();
 /**
  * @swagger
@@ -87,5 +88,76 @@ router.post('/send-otp', auth_1.sendOtpHandler);
  *         description: Invalid or expired OTP
  */
 router.post('/verify-otp', auth_1.verifyOtpHandler);
+/**
+ * @swagger
+ * /auth/complete-profile:
+ *   post:
+ *     summary: Complete user profile by looking up bank account name via Nomba
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [bank_account_number, bank_code]
+ *             properties:
+ *               bank_account_number:
+ *                 type: string
+ *                 example: "0554772814"
+ *               bank_code:
+ *                 type: string
+ *                 example: "058"
+ *     responses:
+ *       200:
+ *         description: Profile completed — name populated from bank account lookup
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       type: object
+ *                       properties:
+ *                         id: { type: string }
+ *                         phone: { type: string }
+ *                         name: { type: string, example: "M.A Animashaun" }
+ *                         bank_account_number: { type: string }
+ *                         bank_name: { type: string }
+ *                 message: { type: string, example: "Profile completed" }
+ *       400:
+ *         description: Invalid bank account or bank code
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/complete-profile', auth_2.authenticate, auth_1.completeProfileHandler);
+/**
+ * @swagger
+ * /auth/whatsapp/status:
+ *   get:
+ *     summary: Check WhatsApp bot connection status
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Current connection state
+ */
+router.get('/whatsapp/status', auth_1.whatsappStatusHandler);
+/**
+ * @swagger
+ * /auth/whatsapp/reconnect:
+ *   post:
+ *     summary: Trigger a manual WhatsApp reconnect
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Reconnect initiated — check server logs for pairing code if needed
+ */
+router.post('/whatsapp/reconnect', auth_1.whatsappReconnectHandler);
 exports.default = router;
 //# sourceMappingURL=auth.js.map

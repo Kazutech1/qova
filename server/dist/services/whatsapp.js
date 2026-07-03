@@ -37,6 +37,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initWhatsApp = initWhatsApp;
+exports.getWhatsAppStatus = getWhatsAppStatus;
+exports.reconnectWhatsApp = reconnectWhatsApp;
 exports.sendWhatsAppMessage = sendWhatsAppMessage;
 const baileys_1 = __importStar(require("@whiskeysockets/baileys"));
 const path_1 = __importDefault(require("path"));
@@ -84,6 +86,9 @@ async function initWhatsApp() {
         auth: state,
         printQRInTerminal: false,
         browser: baileys_1.Browsers.ubuntu('Chrome'),
+        keepAliveIntervalMs: 30000,
+        connectTimeoutMs: 60000,
+        defaultQueryTimeoutMs: undefined,
     });
     sock.ev.on('creds.update', saveCreds);
     sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
@@ -128,6 +133,12 @@ async function initWhatsApp() {
             reconnectDelay = Math.min(reconnectDelay * 2, 60000); // cap at 60s
         }
     });
+}
+function getWhatsAppStatus() {
+    return { connected: sock !== null, ready: isReady };
+}
+async function reconnectWhatsApp() {
+    await initWhatsApp();
 }
 async function sendWhatsAppMessage(phone, message) {
     if (!sock || !isReady)
