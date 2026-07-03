@@ -8,7 +8,7 @@ const options: swaggerJsdoc.Options = {
       version: '1.0.0',
       description: 'Community savings circle platform API',
     },
-    servers: [{ url: 'http://localhost:5000', description: 'Local dev' }],
+    servers: [{ url: '/', description: 'Current host' }],
     components: {
       securitySchemes: {
         bearerAuth: {

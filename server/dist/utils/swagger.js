@@ -13,7 +13,7 @@ const options = {
             version: '1.0.0',
             description: 'Community savings circle platform API',
         },
-        servers: [{ url: 'http://localhost:3000', description: 'Local dev' }],
+        servers: [{ url: '/', description: 'Current host' }],
         components: {
             securitySchemes: {
                 bearerAuth: {
