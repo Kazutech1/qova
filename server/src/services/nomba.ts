@@ -222,7 +222,7 @@ export interface SubaccountBalance {
 }
 
 function normaliseAccount(a: Record<string, string | number>): SubaccountBalance {
-  const rawBalance  = Number(a.balance ?? a.availableBalance ?? a.available_balance ?? 0);
+  const rawBalance  = Number(a.balance ?? a.availableBalance ?? a.available_balance ?? a.amount ?? 0);
   const balanceKobo = Math.round(rawBalance * 100);
   return {
     accountId:     String(a.accountId      ?? a.account_id      ?? ACCOUNT_ID),
@@ -235,21 +235,23 @@ function normaliseAccount(a: Record<string, string | number>): SubaccountBalance
   };
 }
 
+// The parent/master wallet balance (GET /v1/accounts/balance)
+export async function getMasterBalance(): Promise<SubaccountBalance | null> {
+  const balRes = await fetchJsonGet<{ code: string; data: Record<string, string | number> }>(
+    '/v1/accounts/balance'
+  ).catch(() => null);
+  if (!balRes?.data) return null;
+  return normaliseAccount({ ...balRes.data, accountId: ACCOUNT_ID, accountName: 'Master Wallet' });
+}
+
+// Sub-accounts only — our own (parent) account is filtered out
 export async function getSubaccounts(): Promise<SubaccountBalance[]> {
-  // Fetch subaccounts list + main account balance in parallel
-  const [listRes, mainRes] = await Promise.all([
-    fetchJsonGet<{ code: string; data: { results?: Record<string, string | number>[] } }>('/v1/accounts'),
-    fetchJsonGet<{ code: string; data: Record<string, string | number> }>(`/v1/accounts/${ACCOUNT_ID}`).catch(() => null),
-  ]);
-
-  const subaccounts = (listRes.data?.results ?? []).map(normaliseAccount);
-
-  // Prepend main account if it returned balance data and isn't already in the list
-  if (mainRes?.data && !subaccounts.find(a => a.accountId === ACCOUNT_ID)) {
-    subaccounts.unshift(normaliseAccount({ ...mainRes.data, accountId: ACCOUNT_ID }));
-  }
-
-  return subaccounts;
+  const listRes = await fetchJsonGet<{ code: string; data: { results?: Record<string, string | number>[] } }>(
+    '/v1/accounts'
+  );
+  return (listRes.data?.results ?? [])
+    .map(normaliseAccount)
+    .filter(a => a.accountId !== ACCOUNT_ID);
 }
 
 // ─── Transaction Lookup ───────────────────────────────────────────────────────
@@ -272,6 +274,67 @@ export async function getTransaction(reference: string): Promise<TransactionResu
     amount: Number(d.amount ?? 0) * 100, // convert naira back to kobo
     narration: String(d.narration ?? ''),
   };
+}
+
+// ─── Virtual Account Deposit Feed ─────────────────────────────────────────────
+
+export interface VirtualAccountDeposit {
+  accountRef: string;   // our qova-{circleId}-{userId}-cycle{n} reference
+  amountKobo: number;   // gross amount credited
+  reference: string;    // Nomba transaction id
+  timeCreated: string;
+}
+
+// Pulls successful virtual-account credits from Nomba's transaction feed and keys
+// them by our own accountRef. Webhook-independent: used by the reconciliation sweep
+// to settle contributions when webhook delivery is unavailable (shared merchant
+// accounts only have one webhook config, which may not point at us).
+export async function listVirtualAccountDeposits(hoursBack = 48): Promise<VirtualAccountDeposit[]> {
+  const now = new Date();
+  const from = new Date(now.getTime() - hoursBack * 60 * 60 * 1000);
+  const fmt = (d: Date) => d.toISOString().slice(0, 19);
+
+  const deposits: VirtualAccountDeposit[] = [];
+  let cursor: string | undefined;
+
+  // Cursor-paginate a few pages — the shared feed is busy with non-Qova traffic
+  for (let page = 0; page < 5; page++) {
+    const params = new URLSearchParams({
+      limit: '100',
+      dateFrom: fmt(from),
+      dateTo: fmt(now),
+    });
+    if (cursor) params.set('cursor', cursor);
+
+    const res = await fetchJsonGet<{
+      code: string;
+      data?: { results?: Record<string, string>[]; cursor?: string };
+    }>(`/v1/transactions/accounts?${params.toString()}`);
+
+    const txns = res.data?.results ?? [];
+
+    for (const t of txns) {
+      const ref = t.virtualAccountReference ?? '';
+      if (
+        t.type === 'vact_transfer' &&
+        String(t.entryType ?? '').toUpperCase() === 'CREDIT' &&
+        /^success/i.test(String(t.status ?? '')) &&
+        ref.startsWith('qova-')
+      ) {
+        deposits.push({
+          accountRef: ref,
+          amountKobo: Math.round(Number(t.amount ?? 0) * 100),
+          reference: String(t.id ?? ''),
+          timeCreated: String(t.timeCreated ?? ''),
+        });
+      }
+    }
+
+    cursor = res.data?.cursor || undefined;
+    if (!cursor || txns.length === 0) break;
+  }
+
+  return deposits;
 }
 
 // ─── Direct Debit Mandates ────────────────────────────────────────────────────

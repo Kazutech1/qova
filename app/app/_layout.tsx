@@ -1,6 +1,9 @@
 import { Stack } from "expo-router";
+import { useOTAUpdates } from "../src/hooks/useOTAUpdates";
 
 export default function RootLayout() {
+  useOTAUpdates();
+
   return (
     <Stack
       screenOptions={{

@@ -8,6 +8,12 @@
     "scheme": "qova",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "updates": {
+      "url": "https://u.expo.dev/109e3ac1-a0c9-4a4b-9fd3-019c97288246"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.philotex.qova"

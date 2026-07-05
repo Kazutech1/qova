@@ -26,7 +26,7 @@ export default function CircleChat() {
         type: 'me',
       }
     ]);
-    setText(null as any || '');
+    setText('');
   };
 
   return (

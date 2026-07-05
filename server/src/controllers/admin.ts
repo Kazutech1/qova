@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { getSubaccounts } from '../services/nomba';
+import { getSubaccounts, getMasterBalance } from '../services/nomba';
 
 // Temporary — inspect raw Nomba responses
 async function fetchRawAccounts() {
@@ -33,21 +33,22 @@ export async function debugAccountsHandler(_req: Request, res: Response) {
 }
 
 export async function getSubaccountsHandler(_req: Request, res: Response) {
-  const accounts = await getSubaccounts();
+  const [master_wallet, subaccounts] = await Promise.all([getMasterBalance(), getSubaccounts()]);
 
-  const totalKobo = accounts.reduce((sum, a) => sum + a.balanceKobo, 0);
+  const totalKobo = subaccounts.reduce((sum, a) => sum + a.balanceKobo, 0);
 
   res.json({
     success: true,
     data: {
-      accounts,
+      master_wallet,
+      subaccounts,
       summary: {
-        count:        accounts.length,
+        count:        subaccounts.length,
         totalKobo,
         totalNaira:   (totalKobo / 100).toFixed(2),
         currency:     'NGN',
       },
     },
-    message: `${accounts.length} subaccount(s) retrieved`,
+    message: `${subaccounts.length} sub-account(s) retrieved`,
   });
 }

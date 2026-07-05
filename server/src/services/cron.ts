@@ -1,6 +1,6 @@
 import prisma from '../utils/prisma';
 import { checkAndTriggerPayout } from './payout';
-import { debitMandate, getMandateStatus } from './nomba';
+import { debitMandate, getMandateStatus, listVirtualAccountDeposits } from './nomba';
 import { markContributionPaid, ensureAutoDebitContribution } from './contribution';
 import { sendWhatsAppMessage } from './whatsapp';
 
@@ -205,5 +205,60 @@ export async function runMandateActivationCheck() {
       console.error(`[Mandate] status check failed for ${mandate.nomba_mandate_id}:`, err.message);
     }
     await sleep(300);
+  }
+}
+
+// ─── Deposit reconciliation (webhook-independent) ─────────────────────────────
+
+const DEPOSIT_LOOKBACK_HOURS = Number(process.env.DEPOSIT_RECONCILE_LOOKBACK_HOURS ?? 48);
+let isReconciling = false;
+
+// Webhook delivery is unreliable on the shared merchant account, so we pull Nomba's
+// transaction feed and match successful virtual-account deposits to pending
+// contributions by our own accountRef. Same completion path as the webhook
+// (markContributionPaid), so score, cycle anchoring, and payout triggering all apply.
+export async function runDepositReconciliation() {
+  if (isReconciling) return; // avoid overlapping runs
+  isReconciling = true;
+  try {
+    const pending = await prisma.contribution.findMany({
+      where: {
+        status: { in: ['PENDING', 'LATE'] },
+        nomba_account_ref: { not: null },
+      },
+      include: { circle: true },
+    });
+    if (pending.length === 0) return; // nothing to settle — skip the Nomba call
+
+    const deposits = await listVirtualAccountDeposits(DEPOSIT_LOOKBACK_HOURS);
+    if (deposits.length === 0) return;
+
+    const byRef = new Map(deposits.map(d => [d.accountRef, d]));
+    let settled = 0;
+
+    for (const contribution of pending) {
+      const deposit = byRef.get(contribution.nomba_account_ref!);
+      if (!deposit) continue;
+
+      if (deposit.amountKobo < contribution.amount) {
+        console.warn(
+          `[Reconcile] Underpayment on ${contribution.nomba_account_ref}: ` +
+          `got ${deposit.amountKobo} kobo, expected ${contribution.amount} — not marking PAID`
+        );
+        continue;
+      }
+
+      await markContributionPaid(contribution, {
+        nombaReference: deposit.reference,
+        wasLate: contribution.status === 'LATE',
+        paidVia: 'VIRTUAL_ACCOUNT',
+      });
+      settled++;
+      console.log(`[Reconcile] Deposit ${deposit.reference} → contribution ${contribution.id} PAID`);
+    }
+
+    if (settled > 0) console.log(`[Reconcile] Sweep complete — ${settled} contribution(s) settled`);
+  } finally {
+    isReconciling = false;
   }
 }

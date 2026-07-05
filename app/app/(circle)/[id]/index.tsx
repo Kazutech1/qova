@@ -31,6 +31,7 @@ export default function CircleOverview() {
   const [showModal, setShowModal] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const [circle, setCircle] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -55,21 +56,25 @@ export default function CircleOverview() {
       const c = circleRes.circle || circleRes;
       setCircle(c);
 
-      const userProfile = profileRes;
+      const userProfile = profileRes?.user;
       setProfile(userProfile);
 
       if (c.status === 'ACTIVE') {
         const contribRes = await api.getContributions(id).catch(() => ({ contributions: [] }));
-        const userContrib = contribRes.contributions.find((contrib: any) => contrib.user_id === userProfile?.id);
-        setIsPaid(userContrib?.status === 'PAID');
+        const userContrib = contribRes?.contributions?.find((contrib: any) => contrib.user_id === userProfile?.id);
+        const currentlyPaid = userContrib?.status === 'PAID';
+        setIsPaid(currentlyPaid);
 
         // Pre-fetch virtual payment details if unpaid
-        if (userContrib?.status !== 'PAID') {
+        if (!currentlyPaid) {
           try {
             const payRes = await api.payContribution(id);
             setVirtualAccount(payRes);
           } catch (e: any) {
             console.log('[payContribution] Failed to fetch/create virtual account:', e.message);
+            if (e.message?.includes('You have already paid for this cycle')) {
+              setIsPaid(true);
+            }
           }
         }
       }
@@ -119,7 +124,65 @@ export default function CircleOverview() {
     );
   };
 
-  const handlePaymentConfirm = async () => {
+  // Checks the backend for the webhook-driven PAID status of the current user's contribution
+  const checkPaidStatus = async (): Promise<boolean> => {
+    if (!id || !profile?.id) return false;
+    try {
+      const contribRes = await api.getContributions(id);
+      const userContrib = contribRes?.contributions?.find((c: any) => c.user_id === profile.id);
+      return userContrib?.status === 'PAID';
+    } catch {
+      return false;
+    }
+  };
+
+  // Background poll while the deposit sheet is open — a real transfer flips this to PAID
+  useEffect(() => {
+    if (!showModal || isPaid || !virtualAccount) return;
+    let active = true;
+    const interval = setInterval(async () => {
+      const paid = await checkPaidStatus();
+      if (paid && active) {
+        setIsPaid(true);
+        setIsSuccess(true);
+        setShowModal(false);
+      }
+    }, 5000);
+    return () => { active = false; clearInterval(interval); };
+  }, [showModal, isPaid, virtualAccount, profile?.id, id]);
+
+  // Real transfer: "I have sent the money" verifies by polling the contribution status
+  const handleConfirmReal = async () => {
+    if (!virtualAccount) {
+      Alert.alert('Error', 'No virtual payment account generated.');
+      return;
+    }
+    setConfirming(true);
+    try {
+      const deadline = Date.now() + 40000; // ~40s of active polling
+      let paid = false;
+      while (Date.now() < deadline) {
+        paid = await checkPaidStatus();
+        if (paid) break;
+        await new Promise(r => setTimeout(r, 4000));
+      }
+      if (paid) {
+        setIsPaid(true);
+        setIsSuccess(true);
+        setShowModal(false);
+      } else {
+        Alert.alert(
+          'Still confirming',
+          "We haven't seen your transfer yet. Bank transfers can take a minute — this screen will update automatically once it lands.",
+        );
+      }
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  // Dev-only: force the payment through the simulate endpoint
+  const handleSimulate = async () => {
     if (!virtualAccount) {
       Alert.alert('Error', 'No virtual payment account generated.');
       return;
@@ -246,7 +309,7 @@ export default function CircleOverview() {
           <View style={[styles.potStatusContainer, isPaid && styles.paidStatusContainer]}>
             {isPaid && (
               <View style={styles.paidBadgeFloating}>
-                <Ionicons name="checkmark-seal" size={16} color="#FFFFFF" />
+                <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
                 <Text variant="tiny" weight="bold" color="#FFFFFF" style={{ marginLeft: 4 }}>ROUND CLEARED</Text>
               </View>
             )}
@@ -447,13 +510,18 @@ export default function CircleOverview() {
               </Text>
             </View>
 
-            <Button 
-              title={submittingPayment ? "PROCESSING..." : "I HAVE SENT THE MONEY"} 
-              onPress={handlePaymentConfirm} 
+            <Button
+              title={confirming ? "CONFIRMING..." : "I HAVE SENT THE MONEY"}
+              onPress={handleConfirmReal}
               variant="primary"
-              disabled={submittingPayment || !virtualAccount}
+              disabled={confirming || !virtualAccount}
               style={styles.confirmButton}
             />
+            <TouchableOpacity style={styles.cancelButton} onPress={handleSimulate} disabled={submittingPayment || confirming}>
+              <Text variant="caption" weight="bold" color={theme.colors.text.secondary}>
+                {submittingPayment ? 'SIMULATING...' : 'Simulate payment (dev)'}
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.cancelButton} onPress={() => setShowModal(false)}>
               <Text variant="caption" weight="bold" color={theme.colors.text.secondary}>CANCEL</Text>
             </TouchableOpacity>

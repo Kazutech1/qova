@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = 'http://10.213.86.197:5000';
+// const API_BASE_URL = 'http://10.213.86.197:5000';
+const API_BASE_URL = 'https://qova-j40s.onrender.com';
+
 const TOKEN_KEY = '@qova_auth_token';
 
 let cachedToken: string | null = null;
@@ -156,7 +158,7 @@ export const api = {
   },
 
   // Users
-  async getProfile(): Promise<{ id: string; phone: string; name: string; bank_account_number?: string; bank_name?: string; reliability_score: number }> {
+  async getProfile(): Promise<{ user: { id: string; phone: string; name: string; bank_account_number?: string; bank_name?: string; reliability_score: number } }> {
     return await request('/users/me', {
       method: 'GET',
     });
@@ -281,6 +283,33 @@ export const api = {
     return await request('/contributions/simulate-payment', {
       method: 'POST',
       body: JSON.stringify({ account_ref: accountRef }),
+    });
+  },
+
+  // Auto-debit mandates (per-member, individual opt-in)
+  async getMandate(circleId: string): Promise<{ status: string; activation_note: string | null; last_debit_at: string | null; amount: number } | null> {
+    try {
+      return await request(`/circles/${circleId}/mandate`, { method: 'GET' });
+    } catch (e: any) {
+      // No mandate yet → backend returns 404 "No auto-debit mandate found for this circle"
+      if (e.message?.toLowerCase().includes('no auto-debit mandate')) return null;
+      throw e;
+    }
+  },
+
+  async enableAutoDebit(circleId: string): Promise<{ mandate_id: string; status: string; activation_note: string | null }> {
+    return await request(`/circles/${circleId}/mandate`, { method: 'POST' });
+  },
+
+  async disableAutoDebit(circleId: string): Promise<{ status: string }> {
+    return await request(`/circles/${circleId}/mandate`, { method: 'DELETE' });
+  },
+
+  // Payout order (admin only, MANUAL circles) — array of user IDs in payout sequence
+  async setPayoutOrder(circleId: string, payoutOrder: string[]): Promise<{ payout_order: string[] }> {
+    return await request(`/circles/${circleId}/payout-order`, {
+      method: 'POST',
+      body: JSON.stringify({ payout_order: payoutOrder }),
     });
   },
 };

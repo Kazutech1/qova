@@ -12,6 +12,7 @@ interface ButtonProps {
   disabled?: boolean;
   style?: ViewStyle;
   textStyle?: TextStyle;
+  leftComponent?: React.ReactNode;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -23,6 +24,7 @@ export const Button: React.FC<ButtonProps> = ({
   disabled = false,
   style,
   textStyle,
+  leftComponent,
 }) => {
   const getBackgroundColor = () => {
     if (disabled) return theme.colors.outline;
@@ -75,14 +77,17 @@ export const Button: React.FC<ButtonProps> = ({
       {loading ? (
         <ActivityIndicator color={getTextColor()} />
       ) : (
-        <Text
-          variant="body"
-          weight="semiBold"
-          color={getTextColor()}
-          style={textStyle}
-        >
-          {title}
-        </Text>
+        <>
+          {leftComponent}
+          <Text
+            variant="body"
+            weight="semiBold"
+            color={getTextColor()}
+            style={textStyle}
+          >
+            {title}
+          </Text>
+        </>
       )}
     </TouchableOpacity>
   );

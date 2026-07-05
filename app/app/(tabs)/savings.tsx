@@ -59,7 +59,7 @@ export default function SavingsTab() {
 
         <TouchableOpacity style={styles.createNewVault}>
           <View style={styles.createIcon}>
-            <Ionicons name="plus" size={24} color={theme.colors.primary} />
+            <Ionicons name="add" size={24} color={theme.colors.primary} />
           </View>
           <Text variant="body" weight="bold" color={theme.colors.primary}>Create a new vault</Text>
         </TouchableOpacity>
