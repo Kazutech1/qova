@@ -4,7 +4,8 @@ import prisma from '../utils/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { deriveEmail } from '../utils/email';
 import { createCheckoutOrder, deleteTokenizedCard } from '../services/nomba';
-import { cardOrderRef, reconcileCardAuthorization } from '../services/cardautopay';
+import { newCheckoutOrderRef, reconcileCardAuthorization } from '../services/cardautopay';
+import { ensureAutoDebitContribution } from '../services/contribution';
 
 const PUBLIC_URL = process.env.SERVER_PUBLIC_URL ?? 'https://qova-j40s.onrender.com';
 
@@ -37,17 +38,14 @@ export async function createCardAutopayHandler(req: AuthRequest, res: Response) 
   }
 
   // The setup payment covers the current cycle — block if it's already paid
-  const currentContribution = await prisma.contribution.findFirst({
-    where: { user_id: req.userId!, circle_id: circleId, cycle_number: circle.current_cycle },
-  });
-  if (currentContribution?.status === 'PAID') {
+  const contribution = await ensureAutoDebitContribution(circle, req.userId!);
+  if (contribution.status === 'PAID') {
     throw new AppError('You have already paid this cycle — set up card autopay when your next contribution is due', 400);
   }
 
-  // Fresh order ref per attempt (Nomba order refs are single-use); parser tolerates the suffix
-  const orderReference = existing
-    ? cardOrderRef(circleId, req.userId!, circle.current_cycle, Date.now())
-    : cardOrderRef(circleId, req.userId!, circle.current_cycle);
+  // Short random ref (Nomba caps order refs at 50 chars), fresh per attempt,
+  // stamped onto the contribution so settlement is an exact lookup
+  const orderReference = newCheckoutOrderRef(circle.current_cycle);
 
   const order = await createCheckoutOrder({
     orderReference,
@@ -56,6 +54,11 @@ export async function createCardAutopayHandler(req: AuthRequest, res: Response) 
     callbackUrl:   `${PUBLIC_URL}/payments/callback`,
     customerId:    user.id,
     tokenizeCard:  true,
+  });
+
+  await prisma.contribution.update({
+    where: { id: contribution.id },
+    data: { checkout_order_ref: order.orderReference },
   });
 
   await prisma.cardAuthorization.upsert({

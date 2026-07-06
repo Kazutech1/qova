@@ -55,7 +55,7 @@ jest.mock('../utils/prisma', () => ({
 }));
 
 import { runCardChargeSweep } from '../services/cron';
-import { cardOrderRef, parseCardOrderRef } from '../services/cardautopay';
+import { newCheckoutOrderRef } from '../services/cardautopay';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -91,19 +91,14 @@ beforeEach(() => jest.clearAllMocks());
 // ─── Order ref convention ─────────────────────────────────────────────────────
 
 describe('card order refs', () => {
-  it('round-trips without an attempt suffix', () => {
-    const ref = cardOrderRef(CIRCLE_ID, USER_ID, 3);
-    expect(parseCardOrderRef(ref)).toEqual({ circleId: CIRCLE_ID, userId: USER_ID, cycle: 3 });
+  it('stays within Nomba\'s 50-char order reference limit', () => {
+    const ref = newCheckoutOrderRef(999);
+    expect(ref.length).toBeLessThanOrEqual(50);
+    expect(ref.startsWith('qova-')).toBe(true); // feed filter matches on this prefix
   });
 
-  it('round-trips with an attempt suffix', () => {
-    const ref = cardOrderRef(CIRCLE_ID, USER_ID, 3, 1783300000000);
-    expect(parseCardOrderRef(ref)).toEqual({ circleId: CIRCLE_ID, userId: USER_ID, cycle: 3 });
-  });
-
-  it('rejects foreign refs', () => {
-    expect(parseCardOrderRef('checkout_01KWVJK8YHPTWEFZ')).toBeNull();
-    expect(parseCardOrderRef(`qova-${CIRCLE_ID}-${USER_ID}-cycle1`)).toBeNull(); // VA ref, not card
+  it('is unique per call', () => {
+    expect(newCheckoutOrderRef(1)).not.toEqual(newCheckoutOrderRef(1));
   });
 });
 

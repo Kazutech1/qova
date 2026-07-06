@@ -1,72 +1,38 @@
+import crypto from 'crypto';
 import prisma from '../utils/prisma';
 import { listCheckoutPayments, listTokenizedCards, CheckoutPayment } from './nomba';
 import { markContributionPaid } from './contribution';
 import { deriveEmail } from '../utils/email';
 
 // ─── Order reference convention ───────────────────────────────────────────────
-// qova-card-{circleId}-{userId}-cycle{n}[-a{attempt}]
-// Parseable so a checkout payment in the feed can always be traced back to its
-// (user, circle, cycle) even if the contribution row was recreated meanwhile.
+// Nomba caps order references at 50 chars, so ObjectIds can't be embedded.
+// Instead: short random refs (`qova-c-{cycle}-{16 hex}`, ~28 chars) written onto
+// the target Contribution's checkout_order_ref — settlement is an exact lookup.
 
-export function cardOrderRef(circleId: string, userId: string, cycle: number, attempt?: number): string {
-  return `qova-card-${circleId}-${userId}-cycle${cycle}${attempt ? `-a${attempt}` : ''}`;
-}
-
-const ORDER_REF_RE = /^qova-card-([a-f0-9]{24})-([a-f0-9]{24})-cycle(\d+)(?:-a\d+)?$/;
-
-export function parseCardOrderRef(ref: string): { circleId: string; userId: string; cycle: number } | null {
-  const m = ORDER_REF_RE.exec(ref);
-  if (!m) return null;
-  return { circleId: m[1], userId: m[2], cycle: Number(m[3]) };
+export function newCheckoutOrderRef(cycle: number): string {
+  return `qova-c-${cycle}-${crypto.randomBytes(8).toString('hex')}`;
 }
 
 // ─── Settlement ───────────────────────────────────────────────────────────────
 
-// Settles the (user, circle, cycle) contribution behind a successful card payment.
-// Looks the row up by identity, not by ref — resilient to the VA flow having
-// created/recreated the row with a virtual-account ref.
+// Settles the contribution behind a successful card payment by exact ref lookup.
 export async function settleCardPayment(payment: CheckoutPayment): Promise<boolean> {
-  const parsed = parseCardOrderRef(payment.orderReference);
-  if (!parsed) return false;
-
   const contribution = await prisma.contribution.findFirst({
-    where: { user_id: parsed.userId, circle_id: parsed.circleId, cycle_number: parsed.cycle },
+    where: { checkout_order_ref: payment.orderReference },
     include: { circle: true },
   });
+  if (!contribution || contribution.status === 'PAID') return false;
 
-  if (contribution) {
-    if (contribution.status === 'PAID') return false;
-    if (payment.amountKobo < contribution.amount) {
-      console.warn(`[CardAutopay] Underpayment on ${payment.orderReference}: got ${payment.amountKobo}, expected ${contribution.amount}`);
-      return false;
-    }
-    await markContributionPaid(contribution, {
-      nombaReference: payment.reference,
-      wasLate: contribution.status === 'LATE',
-      paidVia: 'CARD',
-    });
-    return true;
+  if (payment.amountKobo < contribution.amount) {
+    console.warn(`[CardAutopay] Underpayment on ${payment.orderReference}: got ${payment.amountKobo}, expected ${contribution.amount}`);
+    return false;
   }
 
-  // No row yet (member paid by card before ever opening the VA sheet) — create + settle
-  const circle = await prisma.circle.findUnique({ where: { id: parsed.circleId } });
-  if (!circle || payment.amountKobo < circle.contribution_amount) return false;
-
-  const created = await prisma.contribution.create({
-    data: {
-      user_id:           parsed.userId,
-      circle_id:         parsed.circleId,
-      cycle_number:      parsed.cycle,
-      amount:            circle.contribution_amount,
-      due_date:          new Date(),
-      status:            'PENDING',
-      nomba_account_ref: payment.orderReference,
-    },
+  await markContributionPaid(contribution, {
+    nombaReference: payment.reference,
+    wasLate: contribution.status === 'LATE',
+    paidVia: 'CARD',
   });
-  await markContributionPaid(
-    { id: created.id, user_id: created.user_id, circle_id: created.circle_id, circle },
-    { nombaReference: payment.reference, wasLate: false, paidVia: 'CARD' },
-  );
   return true;
 }
 

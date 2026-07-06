@@ -9,7 +9,7 @@ import {
   chargeTokenizedCard,
 } from './nomba';
 import { markContributionPaid, ensureAutoDebitContribution } from './contribution';
-import { settleCardPayment, reconcileCardAuthorization, cardOrderRef } from './cardautopay';
+import { settleCardPayment, reconcileCardAuthorization, newCheckoutOrderRef } from './cardautopay';
 import { deriveEmail } from '../utils/email';
 import { sendWhatsAppMessage } from './whatsapp';
 
@@ -349,17 +349,20 @@ export async function runCardChargeSweep() {
       // Cooldown: a recent attempt may still be settling via reconciliation
       if (contribution.auto_debit_last_attempt && now.getTime() - contribution.auto_debit_last_attempt.getTime() < CARD_RETRY_COOLDOWN_MS) continue;
 
-      // Optimistic lock BEFORE the charge — a re-entrant sweep can't double-charge
+      const orderReference = newCheckoutOrderRef(circle.current_cycle);
+
+      // Optimistic lock BEFORE the charge — a re-entrant sweep can't double-charge.
+      // The order ref is stamped here so reconciliation can settle by exact lookup.
       await prisma.contribution.update({
         where: { id: contribution.id },
         data: {
           auto_debit_attempts: { increment: 1 },
           auto_debit_last_attempt: new Date(),
+          checkout_order_ref: orderReference,
         },
       });
 
       const isFinalAttempt = contribution.auto_debit_attempts + 1 >= MAX_ATTEMPTS;
-      const orderReference = cardOrderRef(circle.id, auth.user_id, circle.current_cycle, Date.now());
 
       try {
         const result = await chargeTokenizedCard({

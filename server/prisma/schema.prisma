@@ -78,7 +78,8 @@ model Contribution {
   nomba_account_ref      String?            @unique // virtual account reference for webhook lookup
   virtual_account_number String?
   virtual_account_bank   String?
-  paid_via               String?            // "VIRTUAL_ACCOUNT" | "AUTO_DEBIT" | "MANUAL"
+  paid_via               String?            // "VIRTUAL_ACCOUNT" | "AUTO_DEBIT" | "MANUAL" | "CARD"
+  checkout_order_ref     String?            // latest card-checkout order ref for this contribution (Nomba caps refs at 50 chars)
   auto_debit_attempts    Int                @default(0)
   auto_debit_last_attempt DateTime?
   created_at             DateTime           @default(now())

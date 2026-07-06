@@ -48,9 +48,9 @@ export async function getReliabilityScoreHandler(req: AuthRequest, res: Response
   const score = user.reliability_score;
   const label =
     score >= 91 ? 'Excellent' :
-    score >= 71 ? 'Very Good' :
-    score >= 51 ? 'Good' :
-    score >= 31 ? 'Fair' : 'Poor';
+      score >= 71 ? 'Very Good' :
+        score >= 51 ? 'Good' :
+          score >= 31 ? 'Fair' : 'Poor';
 
   res.json({
     success: true,
