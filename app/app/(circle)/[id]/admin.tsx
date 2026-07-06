@@ -11,6 +11,8 @@ export default function AdminSettings() {
 
   const [autoDebit, setAutoDebit] = useState(false);
   const [autoDebitBusy, setAutoDebitBusy] = useState(false);
+  const [cardAutopay, setCardAutopay] = useState<{ status: string; card_pan_masked: string | null; card_type: string | null } | null>(null);
+  const [cardBusy, setCardBusy] = useState(false);
   const [reminders, setReminders] = useState(true);
 
   const [circle, setCircle] = useState<any>(null);
@@ -30,6 +32,12 @@ export default function AdminSettings() {
         console.warn('[Admin] mandate status failed:', e.message);
       }
       try {
+        const card = await api.getCardAutopay(id);
+        if (card && ['ACTIVE', 'PENDING_TOKENIZATION'].includes(card.status)) setCardAutopay(card);
+      } catch (e: any) {
+        console.warn('[Admin] card autopay status failed:', e.message);
+      }
+      try {
         const [circleRes, membersRes] = await Promise.all([
           api.getCircle(id),
           api.getCircleMembers(id).catch(() => ({ members: [] })),
@@ -46,6 +54,27 @@ export default function AdminSettings() {
       }
     })();
   }, [id]);
+
+  const handleToggleCardAutopay = async (next: boolean) => {
+    if (!id || cardBusy) return;
+    if (next) {
+      Alert.alert(
+        'Card AutoPay',
+        'Enable it from the payment sheet: open your circle, tap CONTRIBUTE, then "Pay with card & enable AutoPay". Your card is saved when you pay.',
+      );
+      return;
+    }
+    setCardBusy(true);
+    try {
+      await api.cancelCardAutopay(id);
+      setCardAutopay(null);
+      Alert.alert('Card AutoPay Off', 'Your saved card will no longer be charged automatically.');
+    } catch (e: any) {
+      Alert.alert('Card AutoPay', e.message || 'Could not turn off card autopay.');
+    } finally {
+      setCardBusy(false);
+    }
+  };
 
   const handleToggleAutoDebit = async (next: boolean) => {
     if (!id || autoDebitBusy) return;
@@ -142,6 +171,27 @@ export default function AdminSettings() {
             <Switch
               value={autoDebit}
               onValueChange={handleToggleAutoDebit}
+              trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+            />
+          )}
+        </View>
+        <View style={styles.settingItem}>
+          <View style={styles.settingText}>
+            <Text variant="body" weight="bold" color={theme.colors.secondary}>Card AutoPay</Text>
+            <Text variant="tiny" color={theme.colors.text.secondary}>
+              {cardAutopay?.status === 'ACTIVE'
+                ? `Active — ${cardAutopay.card_type ?? 'Card'} ${cardAutopay.card_pan_masked?.slice(-4) ?? ''}`
+                : cardAutopay?.status === 'PENDING_TOKENIZATION'
+                ? 'Waiting for your card payment to complete'
+                : 'Charge your saved card automatically each cycle'}
+            </Text>
+          </View>
+          {cardBusy ? (
+            <ActivityIndicator color={theme.colors.primary} />
+          ) : (
+            <Switch
+              value={!!cardAutopay}
+              onValueChange={handleToggleCardAutopay}
               trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
             />
           )}

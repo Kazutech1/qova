@@ -312,4 +312,22 @@ export const api = {
       body: JSON.stringify({ payout_order: payoutOrder }),
     });
   },
+
+  // Card autopay — pay this cycle by card + tokenize it for automatic future charges
+  async setupCardAutopay(circleId: string): Promise<{ checkout_link: string; order_reference: string; amount_kobo: number; status: string }> {
+    return await request(`/circles/${circleId}/card-autopay`, { method: 'POST' });
+  },
+
+  async getCardAutopay(circleId: string): Promise<{ status: string; card_type: string | null; card_pan_masked: string | null; last_charge_at: string | null; token_expires_at: string | null } | null> {
+    try {
+      return await request(`/circles/${circleId}/card-autopay`, { method: 'GET' });
+    } catch (e: any) {
+      if (e.message?.toLowerCase().includes('no card autopay')) return null;
+      throw e;
+    }
+  },
+
+  async cancelCardAutopay(circleId: string): Promise<{ status: string }> {
+    return await request(`/circles/${circleId}/card-autopay`, { method: 'DELETE' });
+  },
 };

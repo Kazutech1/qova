@@ -17,9 +17,9 @@ export const colors = {
 };
 
 export const darkColors = {
-  primary: '#D8F3DC', 
+  primary: '#D8F3DC',
   secondary: '#FFFFFF',
-  background: '#1B4332', 
+  background: '#1B4332',
   surface: '#081C15',
   success: '#52B788',
   warning: '#FFD166',

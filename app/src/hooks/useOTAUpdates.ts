@@ -1,12 +1,13 @@
 import { useEffect } from 'react';
-import * as Updates from 'expo-updates';
 
 // Checks for an OTA update on cold start and, if one is available, downloads and
 // applies it (a brief reload). No-op in development / Expo Go, where updates are
 // disabled — so it never interferes with local dev.
 async function checkForOTAUpdate() {
-  if (__DEV__ || !Updates.isEnabled) return;
+  if (__DEV__) return;
   try {
+    const Updates = require('expo-updates');
+    if (!Updates.isEnabled) return;
     const result = await Updates.checkForUpdateAsync();
     if (result.isAvailable) {
       await Updates.fetchUpdateAsync();

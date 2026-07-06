@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tabs, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet, Platform, TouchableOpacity, SafeAreaView, StatusBar, Share } from 'react-native';
+import { View, StyleSheet, Platform, TouchableOpacity, SafeAreaView, StatusBar, Share, Alert, Clipboard } from 'react-native';
 import { theme } from '../../../src/theme';
 import { Text } from '../../../src/components/common/Text';
 import { api } from '../../../src/services/api';
@@ -38,23 +38,66 @@ export default function CircleLayout() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <SafeAreaView style={styles.headerSafeArea}>
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={24} color={theme.colors.secondary} />
-          </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <Text variant="h3" weight="bold" color={theme.colors.secondary}>{circleName}</Text>
-            <Text variant="tiny" color={theme.colors.text.secondary}>INVITE CODE: {inviteCode || '...'}</Text>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <View style={styles.headerContainer}>
+        {Array.from({ length: 22 }).map((_, index) => {
+          const opacity = Math.max(0, 1 - (index / 22));
+          return (
+            <View
+              key={`gradient-step-${index}`}
+              style={{
+                position: 'absolute',
+                top: index * 7,
+                left: 0,
+                right: 0,
+                height: 8,
+                backgroundColor: '#1B4332',
+                opacity: opacity * 0.95,
+              }}
+            />
+          );
+        })}
+        <SafeAreaView style={styles.headerSafeArea}>
+          <View style={styles.headerTopRow}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <View style={styles.headerCenterArea}>
+              <Text variant="h2" weight="bold" color={theme.colors.secondary} numberOfLines={2} style={{ textAlign: 'center' }}>
+                {circleName}
+              </Text>
+            </View>
+
+            <TouchableOpacity style={styles.settingsButton} onPress={handleShare}>
+              <Ionicons name="share-social-outline" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.settingsButton} onPress={handleShare}>
-            <Ionicons name="share-social-outline" size={20} color={theme.colors.secondary} />
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+
+          <View style={styles.headerBottomRow}>
+            <Text variant="tiny" color={theme.colors.text.secondary} style={{ textAlign: 'center', marginBottom: 8 }}>
+              Active Savings Group
+            </Text>
+            
+            <TouchableOpacity
+              style={styles.invitePill}
+              activeOpacity={0.8}
+              onPress={() => {
+                if (inviteCode) {
+                  Clipboard.setString(inviteCode);
+                  Alert.alert('Copied', 'Invite code copied to clipboard!');
+                }
+              }}
+            >
+              <Text variant="tiny" weight="bold" color={theme.colors.primary}>CODE: {inviteCode || '...'}</Text>
+              <Ionicons name="copy-outline" size={10} color={theme.colors.primary} style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </View>
 
       <Tabs
         screenOptions={{
@@ -123,37 +166,57 @@ export default function CircleLayout() {
 
 const styles = StyleSheet.create({
   headerSafeArea: {
-    backgroundColor: theme.colors.background,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
-    zIndex: 10, // Ensure header stays above scroll
+    zIndex: 10,
   },
-  header: {
+  headerContainer: {
+    position: 'relative',
+    overflow: 'hidden',
+    paddingBottom: 28,
+  },
+  headerTopRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: theme.colors.background,
+    paddingVertical: 12,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.surface,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  headerTitleContainer: {
-    flex: 1,
-    marginLeft: 15,
   },
   settingsButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  headerCenterArea: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 12,
+  },
+  headerBottomRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+  },
+  invitePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(27, 67, 50, 0.08)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(27, 67, 50, 0.12)',
   },
   floatingTabBar: {
     position: 'absolute',

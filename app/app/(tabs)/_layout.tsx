@@ -9,7 +9,7 @@ export default function TabLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <StatusBar style="dark" backgroundColor={theme.colors.background} translucent={false} />
-      
+
       <Tabs
         screenOptions={{
           headerShown: false,
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 30,
     height: 65,
-    paddingBottom: 0, 
+    paddingBottom: 0,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
