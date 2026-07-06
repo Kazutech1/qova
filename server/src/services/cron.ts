@@ -1,7 +1,16 @@
 import prisma from '../utils/prisma';
 import { checkAndTriggerPayout } from './payout';
-import { debitMandate, getMandateStatus, listVirtualAccountDeposits } from './nomba';
+import {
+  debitMandate,
+  getMandateStatus,
+  listVirtualAccountDeposits,
+  listCheckoutPayments,
+  fetchTransactionFeed,
+  chargeTokenizedCard,
+} from './nomba';
 import { markContributionPaid, ensureAutoDebitContribution } from './contribution';
+import { settleCardPayment, reconcileCardAuthorization, cardOrderRef } from './cardautopay';
+import { deriveEmail } from '../utils/email';
 import { sendWhatsAppMessage } from './whatsapp';
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -221,21 +230,30 @@ export async function runDepositReconciliation() {
   if (isReconciling) return; // avoid overlapping runs
   isReconciling = true;
   try {
-    const pending = await prisma.contribution.findMany({
-      where: {
-        status: { in: ['PENDING', 'LATE'] },
-        nomba_account_ref: { not: null },
-      },
-      include: { circle: true },
-    });
-    if (pending.length === 0) return; // nothing to settle — skip the Nomba call
+    const [pending, pendingAuths] = await Promise.all([
+      prisma.contribution.findMany({
+        where: {
+          status: { in: ['PENDING', 'LATE'] },
+          nomba_account_ref: { not: null },
+        },
+        include: { circle: true },
+      }),
+      prisma.cardAuthorization.findMany({
+        where: { status: 'PENDING_TOKENIZATION' },
+        include: { user: true },
+      }),
+    ]);
+    if (pending.length === 0 && pendingAuths.length === 0) return; // nothing to settle — skip the Nomba call
 
-    const deposits = await listVirtualAccountDeposits(DEPOSIT_LOOKBACK_HOURS);
-    if (deposits.length === 0) return;
+    // One feed fetch serves VA deposits, checkout payments, and token activation
+    const feed = await fetchTransactionFeed(DEPOSIT_LOOKBACK_HOURS);
+    const deposits = await listVirtualAccountDeposits(DEPOSIT_LOOKBACK_HOURS, feed);
+    const checkoutPayments = await listCheckoutPayments(DEPOSIT_LOOKBACK_HOURS, feed);
 
     const byRef = new Map(deposits.map(d => [d.accountRef, d]));
     let settled = 0;
 
+    // Virtual-account transfers → match by our accountRef
     for (const contribution of pending) {
       const deposit = byRef.get(contribution.nomba_account_ref!);
       if (!deposit) continue;
@@ -257,8 +275,145 @@ export async function runDepositReconciliation() {
       console.log(`[Reconcile] Deposit ${deposit.reference} → contribution ${contribution.id} PAID`);
     }
 
+    // Card checkout payments → parseable qova-card-… order refs settle by identity
+    for (const payment of checkoutPayments) {
+      if (await settleCardPayment(payment)) {
+        settled++;
+        console.log(`[Reconcile] Card payment ${payment.reference} → ${payment.orderReference} PAID`);
+      }
+    }
+
+    // Pending tokenizations → activate once the checkout completes (feed or token list)
+    for (const auth of pendingAuths) {
+      try {
+        const status = await reconcileCardAuthorization(auth, auth.user.phone, checkoutPayments);
+        if (status === 'ACTIVE') {
+          console.log(`[Reconcile] Card autopay ACTIVE for user ${auth.user_id} on circle ${auth.circle_id}`);
+          await notify(
+            auth.user.phone,
+            `✅ *Qova Card AutoPay*\n\nYour card is saved. Future contributions for this circle will be charged automatically.`
+          );
+        }
+      } catch (e: any) {
+        console.error(`[Reconcile] card auth ${auth.id} reconcile failed:`, e.message);
+      }
+    }
+
     if (settled > 0) console.log(`[Reconcile] Sweep complete — ${settled} contribution(s) settled`);
   } finally {
     isReconciling = false;
+  }
+}
+
+// ─── Card charge sweep (recurring card autopay) ───────────────────────────────
+
+const PUBLIC_URL = process.env.SERVER_PUBLIC_URL ?? 'https://qova-j40s.onrender.com';
+const CARD_RETRY_COOLDOWN_MS = 60 * 60 * 1000; // don't re-charge within an hour of an attempt
+const CARD_VERIFY_DELAY_MS = Number(process.env.CARD_VERIFY_DELAY_MS ?? 8_000);
+let isCardSweeping = false;
+
+// Charges saved cards for due contributions. The charge response is thin, so value is
+// only granted after the payment shows up in the transaction feed — either by the
+// quick in-sweep verify below or by the 60s reconciliation sweep.
+export async function runCardChargeSweep() {
+  if (isCardSweeping) return;
+  isCardSweeping = true;
+  try {
+    const auths = await prisma.cardAuthorization.findMany({
+      where: { status: 'ACTIVE', token_key: { not: null } },
+      include: { circle: true, user: true },
+    });
+    if (auths.length === 0) return;
+
+    const now = new Date();
+    let charged = 0;
+
+    for (const auth of auths) {
+      const circle = auth.circle;
+      if (circle.status !== 'ACTIVE') continue;
+
+      // Expired token → stop charging, prompt re-enrollment
+      if (auth.token_expires_at && auth.token_expires_at < now) {
+        await prisma.cardAuthorization.update({ where: { id: auth.id }, data: { status: 'EXPIRED' } });
+        await notify(
+          auth.user.phone,
+          `⚠️ *Qova Card AutoPay*\n\nYour saved card for *${circle.name}* has expired. Please set up card autopay again.`
+        );
+        continue;
+      }
+
+      const contribution = await ensureAutoDebitContribution(circle, auth.user_id);
+      if (contribution.status === 'PAID') continue;
+      if (!contribution.due_date || contribution.due_date > now) continue; // not due yet
+      if (contribution.auto_debit_attempts >= MAX_ATTEMPTS) continue;
+      // Cooldown: a recent attempt may still be settling via reconciliation
+      if (contribution.auto_debit_last_attempt && now.getTime() - contribution.auto_debit_last_attempt.getTime() < CARD_RETRY_COOLDOWN_MS) continue;
+
+      // Optimistic lock BEFORE the charge — a re-entrant sweep can't double-charge
+      await prisma.contribution.update({
+        where: { id: contribution.id },
+        data: {
+          auto_debit_attempts: { increment: 1 },
+          auto_debit_last_attempt: new Date(),
+        },
+      });
+
+      const isFinalAttempt = contribution.auto_debit_attempts + 1 >= MAX_ATTEMPTS;
+      const orderReference = cardOrderRef(circle.id, auth.user_id, circle.current_cycle, Date.now());
+
+      try {
+        const result = await chargeTokenizedCard({
+          tokenKey:       auth.token_key!,
+          orderReference,
+          customerEmail:  deriveEmail(auth.user.phone),
+          amount:         contribution.amount,
+          callbackUrl:    `${PUBLIC_URL}/payments/callback`,
+        });
+
+        if (result.ok) {
+          // Quick verify: give Nomba a moment, then look for the payment in the feed.
+          // If it isn't visible yet, the reconciliation sweep settles it within ~60s.
+          await sleep(CARD_VERIFY_DELAY_MS);
+          const payments = await listCheckoutPayments(1);
+          const payment = payments.find(p => p.orderReference === orderReference);
+          if (payment && await settleCardPayment(payment)) {
+            await prisma.cardAuthorization.update({
+              where: { id: auth.id },
+              data: { last_charge_at: new Date(), failure_count: 0 },
+            });
+            charged++;
+            console.log(`[CardSweep] Collected ${contribution.amount} kobo — ${circle.name} cycle ${circle.current_cycle} (user ${auth.user_id})`);
+            await notify(
+              auth.user.phone,
+              `✅ *Qova Card AutoPay*\n\nCharged ${formatNaira(contribution.amount)} to your saved card for *${circle.name}* (cycle ${circle.current_cycle}). Thank you!`
+            );
+          } else {
+            console.log(`[CardSweep] Charge accepted for ${orderReference} — awaiting feed confirmation (reconciliation will settle)`);
+          }
+        } else {
+          await prisma.cardAuthorization.update({
+            where: { id: auth.id },
+            data: { failure_count: { increment: 1 } },
+          });
+          console.warn(`[CardSweep] Declined (${result.code}) for ${orderReference}: ${result.message}`);
+          await notify(
+            auth.user.phone,
+            `⚠️ *Qova Card AutoPay*\n\nWe couldn't charge your card ${formatNaira(contribution.amount)} for *${circle.name}* (cycle ${circle.current_cycle}).\nReason: ${result.message || 'declined'}.\n\n${isFinalAttempt ? 'This was the final attempt for this cycle — please pay manually.' : "We'll retry automatically."}`
+          );
+        }
+      } catch (err: any) {
+        await prisma.cardAuthorization.update({
+          where: { id: auth.id },
+          data: { failure_count: { increment: 1 } },
+        });
+        console.error(`[CardSweep] Error charging ${orderReference}:`, err.message);
+      }
+
+      await sleep(300); // space calls to respect rate limits
+    }
+
+    if (charged > 0) console.log(`[CardSweep] Sweep complete — ${charged} contribution(s) collected`);
+  } finally {
+    isCardSweeping = false;
   }
 }

@@ -285,20 +285,17 @@ export interface VirtualAccountDeposit {
   timeCreated: string;
 }
 
-// Pulls successful virtual-account credits from Nomba's transaction feed and keys
-// them by our own accountRef. Webhook-independent: used by the reconciliation sweep
-// to settle contributions when webhook delivery is unavailable (shared merchant
-// accounts only have one webhook config, which may not point at us).
-export async function listVirtualAccountDeposits(hoursBack = 48): Promise<VirtualAccountDeposit[]> {
+// Cursor-paginates the account transaction feed (shared feed is busy with
+// non-Qova traffic, so we fetch a few pages and filter caller-side).
+export async function fetchTransactionFeed(hoursBack: number, maxPages = 5): Promise<Record<string, string>[]> {
   const now = new Date();
   const from = new Date(now.getTime() - hoursBack * 60 * 60 * 1000);
   const fmt = (d: Date) => d.toISOString().slice(0, 19);
 
-  const deposits: VirtualAccountDeposit[] = [];
+  const all: Record<string, string>[] = [];
   let cursor: string | undefined;
 
-  // Cursor-paginate a few pages — the shared feed is busy with non-Qova traffic
-  for (let page = 0; page < 5; page++) {
+  for (let page = 0; page < maxPages; page++) {
     const params = new URLSearchParams({
       limit: '100',
       dateFrom: fmt(from),
@@ -312,29 +309,181 @@ export async function listVirtualAccountDeposits(hoursBack = 48): Promise<Virtua
     }>(`/v1/transactions/accounts?${params.toString()}`);
 
     const txns = res.data?.results ?? [];
-
-    for (const t of txns) {
-      const ref = t.virtualAccountReference ?? '';
-      if (
-        t.type === 'vact_transfer' &&
-        String(t.entryType ?? '').toUpperCase() === 'CREDIT' &&
-        /^success/i.test(String(t.status ?? '')) &&
-        ref.startsWith('qova-')
-      ) {
-        deposits.push({
-          accountRef: ref,
-          amountKobo: Math.round(Number(t.amount ?? 0) * 100),
-          reference: String(t.id ?? ''),
-          timeCreated: String(t.timeCreated ?? ''),
-        });
-      }
-    }
+    all.push(...txns);
 
     cursor = res.data?.cursor || undefined;
     if (!cursor || txns.length === 0) break;
   }
 
-  return deposits;
+  return all;
+}
+
+function isSuccessfulCredit(t: Record<string, string>): boolean {
+  return String(t.entryType ?? '').toUpperCase() === 'CREDIT' && /^success/i.test(String(t.status ?? ''));
+}
+
+// Pulls successful virtual-account credits from Nomba's transaction feed and keys
+// them by our own accountRef. Webhook-independent: used by the reconciliation sweep
+// to settle contributions when webhook delivery is unavailable (shared merchant
+// accounts only have one webhook config, which may not point at us).
+export async function listVirtualAccountDeposits(hoursBack = 48, feed?: Record<string, string>[]): Promise<VirtualAccountDeposit[]> {
+  const txns = feed ?? await fetchTransactionFeed(hoursBack);
+  return txns
+    .filter(t => t.type === 'vact_transfer' && isSuccessfulCredit(t) && (t.virtualAccountReference ?? '').startsWith('qova-'))
+    .map(t => ({
+      accountRef: t.virtualAccountReference!,
+      amountKobo: Math.round(Number(t.amount ?? 0) * 100),
+      reference: String(t.id ?? ''),
+      timeCreated: String(t.timeCreated ?? ''),
+    }));
+}
+
+// ─── Online Checkout / Card Tokenization ──────────────────────────────────────
+
+export interface CheckoutOrderResult {
+  checkoutLink: string;
+  orderReference: string;
+}
+
+export async function createCheckoutOrder(params: {
+  orderReference: string;
+  customerEmail: string;
+  amount: number;        // kobo
+  callbackUrl: string;
+  customerId?: string;
+  tokenizeCard?: boolean;
+}): Promise<CheckoutOrderResult> {
+  const res = await fetchJson<{ code: string; description?: string; data: Record<string, string> }>(
+    '/v1/checkout/order',
+    {
+      order: {
+        orderReference: params.orderReference,
+        customerId:     params.customerId,
+        customerEmail:  params.customerEmail,
+        amount:         params.amount / 100, // Nomba checkout uses naira
+        currency:       'NGN',
+        callbackUrl:    params.callbackUrl,
+      },
+      tokenizeCard: params.tokenizeCard ?? false,
+    }
+  );
+  if (!res.data?.checkoutLink) {
+    throw new Error(`Nomba checkout order error (code ${res.code}): ${res.description ?? 'no checkout link returned'}`);
+  }
+  return {
+    checkoutLink:   res.data.checkoutLink,
+    orderReference: res.data.orderReference ?? params.orderReference,
+  };
+}
+
+export interface TokenizedCard {
+  tokenKey: string;
+  customerEmail: string;
+  cardType: string;
+  cardPanMasked: string;
+  tokenExpirationDate: string;
+}
+
+// Poll-based token retrieval — email is the only supported filter, which works for us
+// because mandate/card flows derive a deterministic {phone}@qova.ng email per user.
+export async function listTokenizedCards(customerEmail: string): Promise<TokenizedCard[]> {
+  const res = await fetchJsonGet<{
+    code: string;
+    data?: { nextPage?: string; tokenizedCardDataList?: Record<string, string>[] };
+  }>(`/v1/checkout/tokenized-card-data?customerEmail=${encodeURIComponent(customerEmail)}`);
+
+  return (res.data?.tokenizedCardDataList ?? []).map(c => ({
+    tokenKey:            c.tokenKey ?? '',
+    customerEmail:       c.customerEmail ?? customerEmail,
+    cardType:            c.cardType ?? '',
+    cardPanMasked:       c.cardPan ?? '',
+    tokenExpirationDate: c.tokenExpirationDate ?? '',
+  }));
+}
+
+export interface CardChargeResult {
+  ok: boolean;
+  code: string;
+  message: string;
+}
+
+// Charges a saved card server-side. Response is thin — callers MUST verify the payment
+// landed via the transaction feed / lookup before granting value (project rule).
+export async function chargeTokenizedCard(params: {
+  tokenKey: string;
+  orderReference: string;
+  customerEmail: string;
+  amount: number;        // kobo
+  callbackUrl: string;
+  customerId?: string;
+}): Promise<CardChargeResult> {
+  const res = await fetchJson<{
+    code: string;
+    description?: string;
+    data?: { status?: boolean; message?: string };
+  }>('/v1/checkout/tokenized-card-payment', {
+    tokenKey: params.tokenKey,
+    order: {
+      orderReference: params.orderReference,
+      customerId:     params.customerId,
+      customerEmail:  params.customerEmail,
+      amount:         params.amount / 100,
+      currency:       'NGN',
+      callbackUrl:    params.callbackUrl,
+    },
+  });
+  return {
+    ok:      res.code === '00' && (res.data?.status ?? false),
+    code:    res.code ?? '',
+    message: res.data?.message ?? res.description ?? '',
+  };
+}
+
+// Best-effort remote token removal on revoke (DELETE with a JSON body per Nomba docs)
+export async function deleteTokenizedCard(tokenKey: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}/v1/checkout/tokenized-card-data`, {
+    method: 'DELETE',
+    headers: await authHeaders(),
+    body: JSON.stringify({ tokenKey }),
+  });
+  const json = await res.json() as { code?: string; description?: string };
+  if (!res.ok || json.code !== '00') {
+    throw new Error(`Nomba token delete failed: ${json.description ?? res.status}`);
+  }
+}
+
+export interface CheckoutPayment {
+  orderReference: string;
+  amountKobo: number;
+  reference: string;     // Nomba transaction id
+  customerEmail: string;
+  tokenKey: string;      // present when the order was created with tokenizeCard
+  cardType: string;
+  cardPanMasked: string;
+  tokenExpiryMonth: string;
+  tokenExpiryYear: string;
+  timeCreated: string;
+}
+
+// Successful Qova checkout payments from the feed — used to settle card-paid
+// contributions and to capture tokenKeys without depending on the webhook.
+// (Field names verified against a live feed row on 2026-07-06.)
+export async function listCheckoutPayments(hoursBack = 48, feed?: Record<string, string>[]): Promise<CheckoutPayment[]> {
+  const txns = feed ?? await fetchTransactionFeed(hoursBack);
+  return txns
+    .filter(t => t.type === 'online_checkout' && isSuccessfulCredit(t) && (t.onlineCheckoutOrderReference ?? '').startsWith('qova-'))
+    .map(t => ({
+      orderReference:   t.onlineCheckoutOrderReference!,
+      amountKobo:       Math.round(Number(t.amount ?? 0) * 100),
+      reference:        String(t.id ?? ''),
+      customerEmail:    String(t.onlineCheckoutCustomerEmail ?? ''),
+      tokenKey:         String(t.onlineCheckoutTokenKey ?? ''),
+      cardType:         String(t.onlineCheckoutCardType ?? ''),
+      cardPanMasked:    String(t.onlineCheckoutCardPan ?? ''),
+      tokenExpiryMonth: String(t.onlineCheckoutTokenExpiryMonth ?? ''),
+      tokenExpiryYear:  String(t.onlineCheckoutTokenExpiryYear ?? ''),
+      timeCreated:      String(t.timeCreated ?? ''),
+    }));
 }
 
 // ─── Direct Debit Mandates ────────────────────────────────────────────────────

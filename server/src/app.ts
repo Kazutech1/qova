@@ -29,6 +29,17 @@ app.get('/health', (_req, res) => {
   res.json({ success: true, data: null, message: 'Qova API is running' });
 });
 
+// Checkout redirect landing — Nomba sends the customer here after a card payment
+app.get('/payments/callback', (_req, res) => {
+  res.send(`<!doctype html>
+<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Qova — Payment received</title>
+<style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f6f8f7;color:#1b4332;text-align:center}div{padding:32px}h1{font-size:1.4rem}p{color:#555}</style>
+</head><body><div>
+<h1>✅ Payment received</h1>
+<p>You can close this page and return to the Qova app.<br>Your contribution will be confirmed automatically.</p>
+</div></body></html>`);
+});
+
 app.use('/auth', authRouter);
 app.use('/users', usersRouter);
 app.use('/circles', circlesRouter);

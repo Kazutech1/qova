@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import prisma from '../utils/prisma';
 import { AppError } from '../middleware/errorHandler';
+import { deriveEmail } from '../utils/email';
 import {
   createDirectDebitMandate,
   getMandateStatus,
@@ -22,11 +23,6 @@ function addDays(date: Date, days: number): Date {
   const d = new Date(date);
   d.setDate(d.getDate() + days);
   return d;
-}
-
-// User has no email field — derive a stable placeholder for Nomba's required field
-function deriveEmail(phone: string): string {
-  return `${phone}@qova.ng`;
 }
 
 const ACTIVE_STATES = ['PENDING_ACTIVATION', 'ACTIVE', 'SUSPENDED'];

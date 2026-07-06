@@ -7,6 +7,7 @@ import {
   runAutoDebitSweep,
   runMandateActivationCheck,
   runDepositReconciliation,
+  runCardChargeSweep,
 } from './services/cron';
 
 const PORT = process.env.PORT || 3000;
@@ -14,6 +15,7 @@ const PORT = process.env.PORT || 3000;
 const MANDATE_CHECK_INTERVAL_MS = Number(process.env.MANDATE_CHECK_INTERVAL_MS ?? 2 * 60 * 60 * 1000);
 const AUTO_DEBIT_SWEEP_INTERVAL_MS = Number(process.env.AUTO_DEBIT_SWEEP_INTERVAL_MS ?? 6 * 60 * 60 * 1000);
 const DEPOSIT_RECONCILE_INTERVAL_MS = Number(process.env.DEPOSIT_RECONCILE_INTERVAL_MS ?? 60 * 1000);
+const CARD_CHARGE_SWEEP_INTERVAL_MS = Number(process.env.CARD_CHARGE_SWEEP_INTERVAL_MS ?? 6 * 60 * 60 * 1000);
 
 initWhatsApp().catch(console.error);
 
@@ -57,7 +59,15 @@ setInterval(() => {
   );
 }, AUTO_DEBIT_SWEEP_INTERVAL_MS);
 
-// Webhook-independent: match Nomba virtual-account deposits to pending contributions.
+// Charge saved cards for due contributions (card autopay).
+// Like the mandate sweep, NOT run at startup — no money movement on deploys.
+setInterval(() => {
+  runCardChargeSweep().catch(err =>
+    console.error('[Cron] Card charge sweep failed:', err.message)
+  );
+}, CARD_CHARGE_SWEEP_INTERVAL_MS);
+
+// Webhook-independent: match Nomba deposits/checkout payments to pending contributions.
 // Runs shortly after boot too, so deposits that landed while we were down get settled.
 setTimeout(() => {
   runDepositReconciliation().catch(err =>

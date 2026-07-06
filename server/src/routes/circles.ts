@@ -14,6 +14,11 @@ import {
   getMandateHandler,
   deleteMandateHandler,
 } from '../controllers/mandates';
+import {
+  createCardAutopayHandler,
+  getCardAutopayHandler,
+  deleteCardAutopayHandler,
+} from '../controllers/cardautopay';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
@@ -306,5 +311,63 @@ router.get('/:id/history', authenticate, getCircleHistoryHandler);
 router.post('/:id/mandate', authenticate, createMandateHandler);
 router.get('/:id/mandate', authenticate, getMandateHandler);
 router.delete('/:id/mandate', authenticate, deleteMandateHandler);
+
+/**
+ * @swagger
+ * /circles/{id}/card-autopay:
+ *   post:
+ *     summary: Pay this cycle by card and enable card autopay (tokenizes the card)
+ *     tags: [Circles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       201:
+ *         description: Checkout link created — complete the card payment to activate
+ *       400:
+ *         description: Circle not active, already paid this cycle, or autopay already active
+ *       403:
+ *         description: Not a member of this circle
+ *   get:
+ *     summary: Get the caller's card autopay status for this circle
+ *     tags: [Circles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Card autopay status (reconciled against Nomba while pending)
+ *       404:
+ *         description: No card autopay found for this circle
+ *   delete:
+ *     summary: Turn off card autopay (revokes the saved card)
+ *     tags: [Circles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Card autopay revoked
+ *       404:
+ *         description: No card autopay found for this circle
+ */
+router.post('/:id/card-autopay', authenticate, createCardAutopayHandler);
+router.get('/:id/card-autopay', authenticate, getCardAutopayHandler);
+router.delete('/:id/card-autopay', authenticate, deleteCardAutopayHandler);
 
 export default router;

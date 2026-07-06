@@ -103,7 +103,7 @@ export async function getCircleHandler(req: AuthRequest, res: Response) {
       memberships: { select: { user_id: true } },
       contributions: {
         where: { status: 'PAID' },
-        select: { amount: true },
+        select: { amount: true, user_id: true },
       },
     },
   });
@@ -112,13 +112,16 @@ export async function getCircleHandler(req: AuthRequest, res: Response) {
 
   const members_count = circle.memberships.length;
   const total_pot = circle.contributions.reduce((sum, c) => sum + c.amount, 0);
+  const user_total_contributed = circle.contributions
+    .filter(c => c.user_id === req.userId)
+    .reduce((sum, c) => sum + c.amount, 0);
   const next_payout_date = circle.status === 'ACTIVE' ? nextPayoutDate(circle.frequency) : null;
 
   const { memberships, contributions, ...circleData } = circle;
 
   res.json({
     success: true,
-    data: { circle: { ...circleData, members_count, total_pot, next_payout_date } },
+    data: { circle: { ...circleData, members_count, total_pot, user_total_contributed, next_payout_date } },
     message: 'Circle retrieved',
   });
 }
