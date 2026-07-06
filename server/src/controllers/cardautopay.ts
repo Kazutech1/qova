@@ -54,6 +54,7 @@ export async function createCardAutopayHandler(req: AuthRequest, res: Response) 
     callbackUrl:   `${PUBLIC_URL}/payments/callback`,
     customerId:    user.id,
     tokenizeCard:  true,
+    allowedPaymentMethods: ['Card'], // land directly on the card form (also: only card yields a token)
   });
 
   await prisma.contribution.update({

@@ -352,6 +352,9 @@ export async function createCheckoutOrder(params: {
   callbackUrl: string;
   customerId?: string;
   tokenizeCard?: boolean;
+  // Restricts the hosted page's payment options, e.g. ['Card'] lands straight on card entry.
+  // Accepted: Card, Transfer, Nomba QR, USSD, Buy Now Pay Later (NG checkout).
+  allowedPaymentMethods?: string[];
 }): Promise<CheckoutOrderResult> {
   const res = await fetchJson<{ code: string; description?: string; data: Record<string, string> }>(
     '/v1/checkout/order',
@@ -363,6 +366,7 @@ export async function createCheckoutOrder(params: {
         amount:         params.amount / 100, // Nomba checkout uses naira
         currency:       'NGN',
         callbackUrl:    params.callbackUrl,
+        ...(params.allowedPaymentMethods ? { allowedPaymentMethods: params.allowedPaymentMethods } : {}),
       },
       tokenizeCard: params.tokenizeCard ?? false,
     }
