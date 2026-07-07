@@ -344,7 +344,86 @@ No new secrets — reuses `NOMBA_CLIENT_ID`, `NOMBA_CLIENT_SECRET`, `NOMBA_ACCOU
 
 ---
 
-## 15. Open Questions
+## 15. Card AutoPay — Tokenized-Card Recurring (Plan B for auto-debit)
+
+**Status:** Planned (2026-07-06). **Why:** Direct Debit is blocked on the shared hackathon
+account by an undocumented NIBSS `subscriberCode` provisioning requirement (confirmed by
+testing — payload is correct, error persists; sandbox 404s the endpoint entirely). Checkout
+*is* provisioned on this account, so card rails work today.
+
+### 15.1 Nomba API surface (verified against docs 2026-07-06)
+
+| Step | Endpoint | Notes |
+| :--- | :--- | :--- |
+| Tokenize | `POST /v1/checkout/order` + `tokenizeCard: true` | order requires `callbackUrl`, `customerEmail`, `amount` (naira), `currency: NGN`; optional `orderReference`, `customerId`. Returns `checkoutLink`. |
+| Get token | `GET /v1/checkout/tokenized-card-data?customerEmail=…` | **Poll-based — webhook-independent.** Filter is email-only → our derived `{phone}@qova.ng` becomes the lookup key. Returns `tokenKey`, masked `cardPan`, `cardType`, `tokenExpirationDate`. |
+| Charge | `POST /v1/checkout/tokenized-card-payment` | `{ tokenKey, order{ callbackUrl, customerEmail, amount, currency, orderReference } }`. Thin response (`data.status`, `data.message`) → verify via feed before granting value. |
+| Verify | transaction feed (`type=online_checkout`) | Rows carry `onlineCheckoutOrderReference` (+ `onlineCheckoutTokenKey`) → extend the existing reconciliation sweep. |
+
+### 15.2 Design (mirrors the mandate feature)
+
+- **One flow, no wasted money:** "Pay with card & enable AutoPay" — the tokenization
+  checkout **is** that cycle's contribution payment. Card gets saved as a side effect.
+- **New model `CardAuthorization`** — per `(user, circle)` like `DirectDebitMandate`:
+  `token_key`, `card_pan_masked`, `card_type`, `token_expires_at`,
+  `status ∈ {PENDING_TOKENIZATION, ACTIVE, REVOKED, FAILED, EXPIRED}`,
+  `order_reference @unique`, `last_charge_at`, `failure_count`, `@@unique([user_id, circle_id])`.
+- **Contribution refs:** checkout path stores `qova-card-{circle}-{user}-cycle{n}` in the
+  existing `nomba_account_ref` column (it's the generic unique payment ref; reconciliation
+  matches VA rows by `virtualAccountReference` and checkout rows by
+  `onlineCheckoutOrderReference` against the same column).
+- **Endpoints:** `POST /circles/:id/card-autopay` (create contribution + checkout order,
+  return `checkoutLink`) · `GET` (status; polls token list while pending) ·
+  `DELETE` (revoke locally + best-effort remote token delete).
+- **Cron:** (a) token-activation poller — `PENDING_TOKENIZATION` auths → poll
+  `tokenized-card-data` by email → `ACTIVE` + WhatsApp notify; (b) charge sweep — due
+  contributions with ACTIVE card auth → `chargeTokenizedCard` → **verify via feed** →
+  `markContributionPaid(paid_via: "CARD_AUTOPAY")`; reuses the optimistic-lock
+  attempt fields; (c) reconciliation sweep extended to settle checkout payments.
+- **App:** `api.setupCardAutopay/getCardAutopay/cancelCardAutopay`; deposit sheet gains a
+  "Pay with card & enable AutoPay" option that opens `checkoutLink` via `expo-web-browser`
+  (already a dependency); admin toggle shows card-autopay status alongside bank mandate.
+- **callbackUrl:** Render URL (`https://qova-j40s.onrender.com/payments/callback` — tiny
+  static "payment received, return to the app" page). Checkout likely requires https, so
+  no `qova://` deep link as primary.
+
+### 15.3 Risks / unknowns (test empirically in Phase D)
+
+1. **Silent charge unconfirmed** — docs never state whether `tokenized-card-payment`
+   skips 3DS/OTP. Must live-test with a real card ASAP; if a charge challenges, autopay
+   degrades to "1-tap charge link" UX rather than unattended collection.
+2. **Charge response is thin** — never mark PAID off `data.status` alone; feed/lookup
+   verification is mandatory (matches project rule).
+3. **Shared account** — tokens are scoped only by `customerEmail` on the shared
+   `accountId`; our derived emails are unique per user, but another team could collide in
+   the same token namespace. Acceptable for hackathon.
+4. **Token expiry** — respect `tokenExpirationDate`; poller flips to `EXPIRED` and
+   prompts re-enrollment.
+5. **Fees** — checkout charges carry fees (feed shows `fixedCharge`); amount checks
+   compare gross amount ≥ expected, same as VA deposits.
+
+### 15.4 Phases
+
+- **Phase A — data + service:** ✅ applied (2026-07-06). `CardAuthorization` model + enum
+  (`db:push` done); nomba.ts: `createCheckoutOrder`, `listTokenizedCards`,
+  `chargeTokenizedCard`, `listCheckoutPayments` + shared `fetchTransactionFeed`
+  paginator (VA deposits refactored onto it). Feed field names verified live.
+- **Phase B — endpoints + app:** ✅ applied (2026-07-06). `POST/GET/DELETE
+  /circles/:id/card-autopay` (`controllers/cardautopay.ts`), shared
+  `services/cardautopay.ts` (order-ref convention + `settleCardPayment` +
+  `reconcileCardAuthorization`), `/payments/callback` page, `deriveEmail` moved to
+  `utils/email.ts`, `deleteTokenizedCard` in nomba.ts; app: api methods,
+  "Pay with card & enable AutoPay" in the deposit sheet, Card AutoPay status row in admin.
+- **Phase C — engine:** ✅ applied (2026-07-06). Reconciliation sweep extended (one feed
+  fetch → VA deposits + checkout settlements + token activation w/ WhatsApp notify);
+  `runCardChargeSweep` (due-date gating, optimistic lock, 1h retry cooldown, token-expiry
+  handling, feed-verified settlement — never trusts the thin charge response); wired into
+  index.ts every 6h (env `CARD_CHARGE_SWEEP_INTERVAL_MS`), no boot run. Tests: 8 new
+  (order-ref convention + sweep paths), suite 33/33.
+- **Phase D — live proof:** tokenize with a real card (₦100 contribution), poll token,
+  fire a test charge (₦50), answer the 3DS question, then full demo-circle rehearsal.
+
+## 16. Open Questions
 
 1. ~~**Mandate granularity**~~ — ✅ **Resolved: per (user, circle).** Members set up
    auto-debit individually per circle; enforced by `@@unique([user_id, circle_id])`.
@@ -352,5 +431,5 @@ No new secrets — reuses `NOMBA_CLIENT_ID`, `NOMBA_CLIENT_SECRET`, `NOMBA_ACCOU
    cron expressions? (Render dyno restarts reset `setInterval` timing.)
 3. **Debit timing** — debit exactly on `due_date`, or N hours before, to leave room for
    retries within the cycle?
-4. **Card fallback** — do we still want tokenized-card auto-debit for members without a
-   supported bank, pending sandbox verification of silent re-charge?
+4. ~~**Card fallback**~~ — ✅ **Resolved: yes, promoted to Plan B** (§15) after Direct
+   Debit was blocked by NIBSS `subscriberCode` provisioning on the shared account.
