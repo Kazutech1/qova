@@ -469,13 +469,15 @@ export interface CheckoutPayment {
   timeCreated: string;
 }
 
-// Successful Qova checkout payments from the feed — used to settle card-paid
+// Successful checkout payments from the feed — used to settle card-paid
 // contributions and to capture tokenKeys without depending on the webhook.
+// No ref-prefix filter: Nomba may replace a custom orderReference with its own
+// UUID (observed live), so callers match refs exactly against stored values.
 // (Field names verified against a live feed row on 2026-07-06.)
 export async function listCheckoutPayments(hoursBack = 48, feed?: Record<string, string>[]): Promise<CheckoutPayment[]> {
   const txns = feed ?? await fetchTransactionFeed(hoursBack);
   return txns
-    .filter(t => t.type === 'online_checkout' && isSuccessfulCredit(t) && (t.onlineCheckoutOrderReference ?? '').startsWith('qova-'))
+    .filter(t => t.type === 'online_checkout' && isSuccessfulCredit(t) && !!t.onlineCheckoutOrderReference)
     .map(t => ({
       orderReference:   t.onlineCheckoutOrderReference!,
       amountKobo:       Math.round(Number(t.amount ?? 0) * 100),
